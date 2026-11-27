@@ -10,6 +10,7 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use SymSvel\Module\Gdpr\Retention\AnonymizationRequirementRegistry;
 use SymSvel\Module\Gdpr\Retention\InactivityPolicy;
+use SymSvel\Module\Gdpr\Consent\ConsentPolicy;
 use SymSvel\Module\Gdpr\Retention\PurgePolicy;
 
 final class GdprBundle extends AbstractBundle
@@ -17,6 +18,7 @@ final class GdprBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $builder->register(InactivityPolicy::class);
+        $builder->register(ConsentPolicy::class);
         $builder->register(PurgePolicy::class);
         $builder->register(AnonymizationRequirementRegistry::class)
             ->setArgument('$requirements', new TaggedIteratorArgument('symsvel.gdpr.anonymization_requirement'));
