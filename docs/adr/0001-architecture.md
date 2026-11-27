@@ -50,3 +50,7 @@ Les modules exposent les finalités facultatives via ConsentPurposeProvider ; GD
 ## Transport navigateur
 
 Utiliser un jeton dédié opaque signé et lié au scope, sans authentification compte, ni cookie cross-origin ni modification de la politique CORS avec credentials. Comparer strictement l'origine au mapping Setup du scope. Le jeton ne sera stocké par le navigateur qu'après une décision explicite, y compris refus ; aucune création de ligne lors d'une simple consultation. L'API doit limiter la création abusive, refuser une configuration non fiable et garantir le défaut fermé. Rotation du secret : nouveau choix requis. Validation navigateur et CORS à réaliser.
+
+## Première API et quotas
+
+Le module expose POST state et PUT consent sous /apiopen/gdpr/{app|front}, contrôles exacts du mapping Setup, HTTPS backend hors dev local, jeton Bearer dédié au consentement et réponses no-store. Aucune ligne ni jeton à la lecture. Le quota persistant HMAC-IP limite les créations à une par seconde, sans bloquer les retraits par version courante. Nettoyage quotidien indépendant du traitement des comptes, y compris lorsque GDPR est désactivé. Les origines ne sont pas une authentification de client hors navigateur ; une limitation réseau globale reste requise. Le Back n'ajoute que le CORS générique /apiopen sans credentials. CT navigateur et quatre SGBD avant activation du chargement.

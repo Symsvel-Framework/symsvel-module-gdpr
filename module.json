@@ -5,7 +5,8 @@
         "settings": "*"
     },
     "tables": [
-        "symsvel_gdpr_consents"
+        "symsvel_gdpr_consents",
+        "symsvel_gdpr_creation_limits"
     ],
     "components": {
         "back": "back",

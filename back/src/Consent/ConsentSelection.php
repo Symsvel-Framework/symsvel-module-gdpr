@@ -16,10 +16,13 @@ final readonly class ConsentSelection
 
     public function state(string $scope, ?string $visitorToken, bool $enabled, \DateTimeImmutable $now): array
     {
-        $purposes = $this->catalogue->current($scope);
+        if (!in_array($scope, ['app', 'front'], true)) {
+            throw new \InvalidArgumentException('Invalid consent scope.');
+        }
         if (!$enabled) {
             return ['enabled' => false, 'version' => null, 'expires_at' => null, 'complete' => false, 'purposes' => []];
         }
+        $purposes = $this->catalogue->current($scope);
         $snapshot = $visitorToken === null ? null : $this->repository->find($visitorToken, $scope);
         $current = $snapshot !== null && $snapshot->decidedAt <= $now && $snapshot->expiresAt > $now;
         $complete = $current && count($snapshot->choices) === count($purposes);
