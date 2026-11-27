@@ -42,3 +42,7 @@ Le provider GDPR utilise l'extension générique Settings PR #5 (valeurs par dé
 ## Persistance minimale des choix
 
 Dernière sélection complète par navigateur et scope, avec jeton opaque aléatoire indépendant du compte et stocké sous forme d'empreinte uniquement. Le remplacement conditionnel à la version courante protège contre une écriture obsolète après retrait. La preuve historique exhaustive n'est pas fournie par cette première table ; définir la conservation nécessaire avant publication. Les choix expirés ne sont jamais valides et doivent être nettoyés. Le transport du jeton et la validation de la configuration actuelle doivent être raccordés avant toute exposition publique.
+
+## Catalogue et choix complets
+
+Les modules exposent les finalités facultatives via ConsentPurposeProvider ; GDPR reste indépendant de Tracking. Le catalogue actif est relu à chaque opération. Une sélection incomplète, une révision obsolète ou une version d'écriture concurrente est refusée. Le choix négatif est explicite et le nouveau catalogue ne réutilise pas un grant d'une ancienne révision. Le service n'est pas directement accessible au navigateur ; transport, limitation des abus et configuration de confiance restent à raccorder. Les métadonnées ne contiennent aucun code ni identifiant technique de chargement.

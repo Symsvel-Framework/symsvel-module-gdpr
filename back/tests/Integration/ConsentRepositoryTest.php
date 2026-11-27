@@ -11,6 +11,10 @@ use PHPUnit\Framework\TestCase;
 use SymSvel\Module\Gdpr\Consent\ConsentPolicy;
 use SymSvel\Module\Gdpr\Consent\ConsentRepository;
 use SymSvel\Module\Gdpr\Consent\ConsentSnapshot;
+use SymSvel\Module\Gdpr\Consent\ConsentCatalogue;
+use SymSvel\Module\Gdpr\Consent\ConsentPurpose;
+use SymSvel\Module\Gdpr\Consent\ConsentPurposeProvider;
+use SymSvel\Module\Gdpr\Consent\ConsentSelection;
 
 final class ConsentRepositoryTest extends TestCase
 {
@@ -83,6 +87,53 @@ final class ConsentRepositoryTest extends TestCase
         self::assertSame(1, $this->repository->removeExpired($snapshot->expiresAt));
         self::assertNull($this->repository->find($token, 'front'));
         self::assertFalse($this->repository->replace($token, $this->snapshot('front', true, '2'), $snapshot->version));
+    }
+
+    public function testSelectionRequiresCurrentCompleteCatalogueAndHonorsWithdrawal(): void
+    {
+        $provider = new class implements ConsentPurposeProvider {
+            public int $revision = 2;
+            public function purposes(string $scope): iterable
+            {
+                if ($scope === 'front') {
+                    yield new ConsentPurpose('tracker-example', $this->revision, 'Example', 'Audience', 'Description', 'https://example.invalid/privacy');
+                }
+            }
+        };
+        $selection = new ConsentSelection(new ConsentCatalogue([$provider]), $this->repository, new ConsentPolicy());
+        $token = str_repeat('a', 64);
+        $now = new \DateTimeImmutable('2026-11-27T14:00:00Z');
+        $initial = $selection->state('front', null, true, $now);
+        self::assertFalse($initial['complete']);
+        self::assertFalse($initial['purposes'][0]['granted']);
+        foreach ([[], ['tracker-example' => ['revision' => 1, 'granted' => true]],
+            ['other' => ['revision' => 2, 'granted' => true]]] as $invalid) {
+            try {
+                $selection->save('front', $token, null, $invalid, true, 6, $now);
+                self::fail('Invalid or incomplete selection accepted.');
+            } catch (\DomainException) {
+                self::assertNull($this->repository->find($token, 'front'));
+            }
+        }
+        $grant = $selection->save('front', $token, null,
+            ['tracker-example' => ['revision' => 2, 'granted' => true]], true, 6, $now);
+        self::assertTrue($selection->state('front', $token, true, $now)['complete']);
+        self::assertTrue($selection->state('front', $token, true, $now)['purposes'][0]['granted']);
+        self::assertSame([], $selection->state('front', $token, false, $now)['purposes']);
+        self::assertSame([], $selection->state('app', $token, true, $now)['purposes']);
+
+        $provider->revision = 3;
+        $changed = $selection->state('front', $token, true, $now);
+        self::assertFalse($changed['complete']);
+        self::assertFalse($changed['purposes'][0]['granted']);
+        $selection->save('front', $token, $grant->version,
+            ['tracker-example' => ['revision' => 3, 'granted' => false]], true, 6, $now);
+        self::assertTrue($selection->state('front', $token, true, $now)['complete']);
+        self::assertFalse($selection->state('front', $token, true, $now)['purposes'][0]['granted']);
+
+        $this->expectException(\DomainException::class);
+        $selection->save('front', $token, $grant->version,
+            ['tracker-example' => ['revision' => 3, 'granted' => true]], true, 6, $now);
     }
 
     public function testRejectsBoScope(): void
