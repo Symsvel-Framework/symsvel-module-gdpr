@@ -15,6 +15,11 @@ final class InactivityPolicy
     public const WARN = 'warn';
     public const ERASE = 'erase';
 
+    public function activityReference(\DateTimeImmutable $createdAt, ?\DateTimeImmutable $lastLogin): \DateTimeImmutable
+    {
+        return ($lastLogin ?? $createdAt)->setTimezone(new \DateTimeZone('UTC'));
+    }
+
     public function deadline(\DateTimeImmutable $activity, int $months): \DateTimeImmutable
     {
         if ($months < 1) {
