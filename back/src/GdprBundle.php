@@ -12,6 +12,8 @@ use SymSvel\Module\Gdpr\Retention\AnonymizationRequirementRegistry;
 use SymSvel\Module\Gdpr\Retention\InactivityPolicy;
 use SymSvel\Module\Gdpr\Consent\ConsentPolicy;
 use SymSvel\Module\Gdpr\Retention\PurgePolicy;
+use SymSvel\Module\Gdpr\Settings\GdprSettingDefinitionProvider;
+use SymSvel\Module\Gdpr\Settings\GdprConfiguration;
 
 final class GdprBundle extends AbstractBundle
 {
@@ -20,7 +22,9 @@ final class GdprBundle extends AbstractBundle
         $builder->register(InactivityPolicy::class);
         $builder->register(ConsentPolicy::class);
         $builder->register(PurgePolicy::class);
+        $builder->register(GdprSettingDefinitionProvider::class)->setAutowired(true)->addTag('symsvel.settings.definition_provider');
+        $builder->register(GdprConfiguration::class)->setAutowired(true);
         $builder->register(AnonymizationRequirementRegistry::class)
-            ->setArgument('$requirements', new TaggedIteratorArgument('symsvel.gdpr.anonymization_requirement'));
+            ->setArgument(0, new TaggedIteratorArgument('symsvel.gdpr.anonymization_requirement'));
     }
 }
