@@ -46,3 +46,7 @@ Dernière sélection complète par navigateur et scope, avec jeton opaque aléat
 ## Catalogue et choix complets
 
 Les modules exposent les finalités facultatives via ConsentPurposeProvider ; GDPR reste indépendant de Tracking. Le catalogue actif est relu à chaque opération. Une sélection incomplète, une révision obsolète ou une version d'écriture concurrente est refusée. Le choix négatif est explicite et le nouveau catalogue ne réutilise pas un grant d'une ancienne révision. Le service n'est pas directement accessible au navigateur ; transport, limitation des abus et configuration de confiance restent à raccorder. Les métadonnées ne contiennent aucun code ni identifiant technique de chargement.
+
+## Transport navigateur
+
+Utiliser un jeton dédié opaque signé et lié au scope, sans authentification compte, ni cookie cross-origin ni modification de la politique CORS avec credentials. Comparer strictement l'origine au mapping Setup du scope. Le jeton ne sera stocké par le navigateur qu'après une décision explicite, y compris refus ; aucune création de ligne lors d'une simple consultation. L'API doit limiter la création abusive, refuser une configuration non fiable et garantir le défaut fermé. Rotation du secret : nouveau choix requis. Validation navigateur et CORS à réaliser.

@@ -14,6 +14,8 @@ use SymSvel\Module\Gdpr\Consent\ConsentPolicy;
 use SymSvel\Module\Gdpr\Consent\ConsentRepository;
 use SymSvel\Module\Gdpr\Consent\ConsentCatalogue;
 use SymSvel\Module\Gdpr\Consent\ConsentSelection;
+use SymSvel\Module\Gdpr\Consent\BrowserConsentToken;
+use SymSvel\Module\Gdpr\Consent\TrustedConsentOrigin;
 use SymSvel\Module\Gdpr\Retention\PurgePolicy;
 use SymSvel\Module\Gdpr\Settings\GdprSettingDefinitionProvider;
 use SymSvel\Module\Gdpr\Settings\GdprConfiguration;
@@ -28,6 +30,8 @@ final class GdprBundle extends AbstractBundle
         $builder->register(ConsentCatalogue::class)
             ->setArgument(0, new TaggedIteratorArgument('symsvel.gdpr.consent_purpose_provider'));
         $builder->register(ConsentSelection::class)->setAutowired(true);
+        $builder->register(BrowserConsentToken::class)->setAutowired(true);
+        $builder->register(TrustedConsentOrigin::class)->setArgument('$environment', '%kernel.environment%');
         $builder->register(PurgePolicy::class);
         $builder->register(GdprSettingDefinitionProvider::class)->setAutowired(true)->addTag('symsvel.settings.definition_provider');
         $builder->register(GdprConfiguration::class)->setAutowired(true);
