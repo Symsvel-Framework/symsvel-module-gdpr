@@ -1,0 +1,30 @@
+{
+    "manifests": {
+        "symsvel-framework/module-gdpr": {
+            "manifest": {
+                "bundles": {
+                    "SymSvel\\Module\\Gdpr\\GdprBundle": [
+                        "all"
+                    ]
+                },
+                "copy-from-recipe": {
+                    "config/": "%CONFIG_DIR%/"
+                }
+            },
+            "files": {
+                "config/routes/gdpr.yaml": {
+                    "contents": [
+                        "gdpr:",
+                        "    resource:",
+                        "        path: '../../vendor/symsvel-framework/module-gdpr/back/src/Controller/'",
+                        "        namespace: SymSvel\\Module\\Gdpr\\Controller",
+                        "    type: attribute",
+                        ""
+                    ],
+                    "executable": false
+                }
+            },
+            "ref": "REPLACE_WITH_RECIPE_COMMIT_SHA"
+        }
+    }
+}
