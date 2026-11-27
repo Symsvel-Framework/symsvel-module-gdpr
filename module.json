@@ -4,7 +4,9 @@
     "dependencies": {
         "settings": "*"
     },
-    "tables": [],
+    "tables": [
+        "symsvel_gdpr_consents"
+    ],
     "components": {
         "back": "back",
         "bo": "bo",
