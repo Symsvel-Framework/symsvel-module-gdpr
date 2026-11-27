@@ -14,6 +14,18 @@ final class InactivityPolicyTest extends TestCase
         return new \DateTimeImmutable($value, new \DateTimeZone('UTC'));
     }
 
+    public function testNeverUsedAccountFallsBackToCreationDate(): void
+    {
+        $policy = new InactivityPolicy();
+        $created = $this->at('2024-01-01');
+        $login = $this->at('2026-11-01');
+        self::assertSame($created->format(DATE_ATOM), $policy->activityReference($created, null)->format(DATE_ATOM));
+        self::assertSame($login->format(DATE_ATOM), $policy->activityReference($created, $login)->format(DATE_ATOM));
+        $now = $this->at('2026-11-27');
+        self::assertSame(InactivityPolicy::WARN, $policy->decide($policy->activityReference($created, null), $now, 12, 7));
+        self::assertSame(InactivityPolicy::WAIT, $policy->decide($policy->activityReference($created, $login), $now, 12, 7));
+    }
+
     public function testCalendarDeadlineClampsEndOfMonthAndLeapDay(): void
     {
         $policy = new InactivityPolicy();
