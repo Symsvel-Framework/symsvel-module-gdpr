@@ -11,3 +11,35 @@ jobs:
           extensions: pdo_sqlite
       - run: composer install --no-interaction --prefer-dist
       - run: composer qa
+  browser-client:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        scope: [app, front]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Symsvel-Framework/symsvel-${{ matrix.scope }}
+          ref: dev
+          path: assembled
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: assembled/package-lock.json
+      - name: Assemble module client
+        run: |
+          cmp app/src/lib/modules/gdpr/consent-client.ts front/src/lib/modules/gdpr/consent-client.ts
+          mkdir -p assembled/src/lib/modules/gdpr
+          cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.ts assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/tests/consent-client.test.ts" assembled/src/lib/modules/gdpr/
+      - working-directory: assembled
+        run: npm ci --no-audit --no-fund
+      - working-directory: assembled
+        run: |
+          npm run format
+          npm run check
+          npm run lint
+          npm run build
+          npm run test:unit -- --run --project server src/lib/modules/gdpr/consent-client.test.ts

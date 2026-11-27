@@ -54,3 +54,7 @@ Utiliser un jeton dédié opaque signé et lié au scope, sans authentification 
 ## Première API et quotas
 
 Le module expose POST state et PUT consent sous /apiopen/gdpr/{app|front}, contrôles exacts du mapping Setup, HTTPS backend hors dev local, jeton Bearer dédié au consentement et réponses no-store. Aucune ligne ni jeton à la lecture. Le quota persistant HMAC-IP limite les créations à une par seconde, sans bloquer les retraits par version courante. Nettoyage quotidien indépendant du traitement des comptes, y compris lorsque GDPR est désactivé. Les origines ne sont pas une authentification de client hors navigateur ; une limitation réseau globale reste requise. Le Back n'ajoute que le CORS générique /apiopen sans credentials. CT navigateur et quatre SGBD avant activation du chargement.
+
+## Client statique
+
+Le client de consentement est identique dans les deux scopes ; aucune dépendance npm ou framework externe supplémentaire. Il exige PUBLIC_API_URL, utilise le transport dédié sans cookie ni redirection et vérifie la réponse avant toute utilisation. Le marqueur local de blocage doit être écrit avant le retrait et ne sera levé qu'après confirmation et réconciliation serveur. Le futur composant doit traiter les événements de stockage, les erreurs et la revalidation avant activation du moindre SDK. Aucun montage automatique pour le moment.
