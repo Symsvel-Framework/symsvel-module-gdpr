@@ -6,7 +6,7 @@
     "require": {
         "php": ">=8.4",
         "symfony/framework-bundle": "^8.1",
-        "symsvel-framework/module-settings": "dev-feat/managed-setting-values"
+        "symsvel-framework/module-settings": "dev-dev"
     },
     "autoload": {
         "psr-4": {
@@ -32,7 +32,8 @@
             "manifest": "module.json"
         },
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "1.0.x-dev",
+            "dev-dev": "0.1.x-dev"
         }
     },
     "repositories": [
