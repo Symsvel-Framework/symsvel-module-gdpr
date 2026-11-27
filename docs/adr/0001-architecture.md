@@ -30,3 +30,7 @@ Consentements versionnés par finalité, fournisseur/configuration et scope selo
 - Tests d'échéance, changement de politique, échecs/reprise SMTP, concurrence login/cron, suppression/neutralisation et révocation ; repli created_at, préavis complet même en cas d'échéance passée, verrou multi-modules et refus API/runtime de delete.
 - CI, CT XT sur PostgreSQL/MySQL/MariaDB/SQLite, documentation dev/admin/user et validation du mainteneur.
 - Pas de promotion stable ni modification du Setup avant validation.
+
+## Première politique de consentement (27/11/2026)
+
+Le contrat initial est indépendant de Tracking : sujet de consentement, révision, scope App/Front, décision explicite, date et expiration UTC. La permission est refusée par défaut ; une décision obsolète ou provenant d'un autre scope est inutilisable. Le stockage et l'identification du navigateur devront garantir la sélection de la décision courante et le retrait effectif ; la classe pure n'est pas une preuve de consentement. La durée de six mois employée dans les tests est une proposition configurable, pas une règle universelle.
