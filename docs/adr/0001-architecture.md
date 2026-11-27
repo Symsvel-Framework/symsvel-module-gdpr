@@ -34,3 +34,7 @@ Consentements versionnés par finalité, fournisseur/configuration et scope selo
 ## Première politique de consentement (27/11/2026)
 
 Le contrat initial est indépendant de Tracking : sujet de consentement, révision, scope App/Front, décision explicite, date et expiration UTC. La permission est refusée par défaut ; une décision obsolète ou provenant d'un autre scope est inutilisable. Le stockage et l'identification du navigateur devront garantir la sélection de la décision courante et le retrait effectif ; la classe pure n'est pas une preuve de consentement. La durée de six mois employée dans les tests est une proposition configurable, pas une règle universelle.
+
+## Raccordement des paramètres (27/11/2026)
+
+Le provider GDPR utilise l'extension générique Settings PR #5 (valeurs par défaut et imposées), sans introduire de logique GDPR dans Settings. purge_locked est toujours imposé (0 ou 1) ; deletion_mode est imposé à anonymize uniquement lorsqu'un module actif l'exige. Le choix est persisté lors du cycle de synchronisation. Le runtime réévalue la politique avant utilisation. La dépendance Composer de chantier cible temporairement la branche Settings correspondante et devra être stabilisée avant publication. Les durées sont validées au runtime ; le texte multilingue de confidentialité reste à implémenter. Le cycle réel d'installation/retrait et ses garanties transactionnelles restent à valider sur XT.
