@@ -12,6 +12,8 @@ use SymSvel\Module\Gdpr\GdprBundle;
 use SymSvel\Module\Gdpr\Retention\AnonymizationRequirementRegistry;
 use SymSvel\Module\Gdpr\Retention\InactivityPolicy;
 use SymSvel\Module\Gdpr\Retention\PurgePolicy;
+use SymSvel\Module\Gdpr\Settings\GdprSettingDefinitionProvider;
+use SymSvel\Module\Gdpr\Settings\GdprConfiguration;
 
 final class GdprBundleServicesTest extends TestCase
 {
@@ -23,7 +25,9 @@ final class GdprBundleServicesTest extends TestCase
 
         self::assertTrue($builder->hasDefinition(PurgePolicy::class));
         self::assertTrue($builder->hasDefinition(InactivityPolicy::class));
-        $argument = $builder->getDefinition(AnonymizationRequirementRegistry::class)->getArgument('$requirements');
+        self::assertTrue($builder->getDefinition(GdprSettingDefinitionProvider::class)->hasTag('symsvel.settings.definition_provider'));
+        self::assertTrue($builder->hasDefinition(GdprConfiguration::class));
+        $argument = $builder->getDefinition(AnonymizationRequirementRegistry::class)->getArgument(0);
         self::assertInstanceOf(TaggedIteratorArgument::class, $argument);
         self::assertSame('symsvel.gdpr.anonymization_requirement', $argument->getTag());
     }
