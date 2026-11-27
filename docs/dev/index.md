@@ -15,3 +15,7 @@ Voir [ADR 0001](../adr/0001-architecture.md) pour le périmètre cible et les d�
 `Retention/InactivityPolicy` calcule une échéance calendaire UTC et retourne `wait`, `warn` ou `erase`. Le résultat erase désigne un candidat à vérifier et ne déclenche rien. Les tests couvrent les échéances, le préavis effectif et les dates incohérentes. Aucun Settings, cron, mail, migration ou effacement opérationnel n'est encore raccordé.
 
 Validation : composer qa puis CI, intégration et crash-tests XT avant publication fonctionnelle.
+
+## Arbitrages mainteneur (27/11/2026)
+
+`InactivityPolicy::activityReference()` utilise `last_login ?? created_at`, y compris pour les comptes historiques ; le préavis complet reste obligatoire. `PurgePolicy` choisit anonymize par défaut et refuse delete si un module actif exige la neutralisation. La future clé Settings `gdpr.purge.locked` est calculée et non éditable ; le passage forcé vers anonymize devra être persisté afin de ne pas réactiver delete au déverrouillage. Ces classes pures ne raccordent pas encore le registre des modules, Settings, les API ou le cron. Voir ADR 0001 pour les garanties et limites.
