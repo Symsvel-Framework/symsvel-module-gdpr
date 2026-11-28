@@ -25,12 +25,11 @@ final readonly class InactivityNoticeDispatch
 
     public function dispatch(int $id, string $email, ?string $language, \DateTimeImmutable $activity, \DateTimeImmutable $now): string
     {
-        if (!$this->configuration->inactivityEnabled()) {
-            return 'disabled';
-        }
-        $months = $this->configuration->inactivityMonths();
-        $days = $this->configuration->warningDays();
-        $mode = $this->configuration->deletionMode();
+        $rules = $this->configuration->inactivityRules();
+        if ($rules === null) return 'disabled';
+        $months = $rules['months'];
+        $days = $rules['warningDays'];
+        $mode = $rules['mode'];
         $cycle = $this->cycles->fingerprint($id, $email, $activity, $months, $days, $mode);
         $notice = $this->notices->find($id, $cycle);
         if ($notice !== null && $notice['sent_at'] === null) {

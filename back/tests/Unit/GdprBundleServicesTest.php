@@ -27,6 +27,9 @@ final class GdprBundleServicesTest extends TestCase
         self::assertTrue($builder->hasDefinition(InactivityPolicy::class));
         self::assertTrue($builder->getDefinition(GdprSettingDefinitionProvider::class)->hasTag('symsvel.settings.definition_provider'));
         self::assertTrue($builder->hasDefinition(GdprConfiguration::class));
+        self::assertSame('symsvel.gdpr.account_retention_owner', $builder->getDefinition(\SymSvel\Module\Gdpr\Retention\AccountRetentionOwnerRegistry::class)->getArgument(0)->getTag());
+        self::assertSame('symsvel.gdpr.account_erasure_contributor', $builder->getDefinition(\SymSvel\Module\Gdpr\Retention\AccountErasureContributorRegistry::class)->getArgument(1)->getTag());
+        self::assertTrue($builder->getDefinition(\SymSvel\Module\Gdpr\Command\ProcessInactivityCommand::class)->hasTag('console.command'));
         $argument = $builder->getDefinition(AnonymizationRequirementRegistry::class)->getArgument(0);
         self::assertInstanceOf(TaggedIteratorArgument::class, $argument);
         self::assertSame('symsvel.gdpr.anonymization_requirement', $argument->getTag());

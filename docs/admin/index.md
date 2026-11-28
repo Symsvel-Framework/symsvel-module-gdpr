@@ -9,3 +9,7 @@ La gestion GDPR et le traitement d'inactivité sont activés par défaut ; les d
 ## Nettoyage des consentements
 
 La commande serveur `php bin/console symsvel:gdpr:cleanup-consents --env=prod` retire les choix expirés et les empreintes temporaires de limitation des créations. Programmer son exécution quotidienne via cron. Ce nettoyage ne traite pas les comptes Users. Il fonctionne aussi lorsque GDPR est désactivé. Les interfaces de choix et le chargement des traceurs restent à raccorder et valider.
+
+## Comptes inactifs
+
+La commande `php bin/console symsvel:gdpr:process --env=prod` est une simulation par défaut. Elle affiche les candidats au préavis ou au traitement, les tentatives ambiguës et les erreurs sans afficher les adresses. Pour autoriser une exécution manuelle, ajouter `--execute` ; `--batch-size=100` borne les lots. Ne planifier aucune exécution automatique avant validation du projet, du transport mail synchrone, des obligations de conservation et des CT. Une tentative de préavis ambiguë bloque le traitement ; ne jamais l'assimiler à une livraison confirmée. BO seul sans propriétaire Users : aucune action. Le verrou de commande est local à l'hôte ; les contrôles de cycle et de transaction restent obligatoires. Le raccordement du propriétaire natif est encore en chantier.

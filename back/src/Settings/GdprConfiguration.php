@@ -51,6 +51,21 @@ final readonly class GdprConfiguration
         );
     }
 
+    /** @return array{months:int,warningDays:int,mode:string}|null */
+    public function inactivityRules(bool $lock = false): ?array
+    {
+        $values = $this->settings->currentValues([
+            'gdpr.enabled', 'gdpr.inactivity_enabled', 'gdpr.inactivity_months',
+            'gdpr.inactivity_warning_days', 'gdpr.deletion_mode',
+        ], $lock);
+        if ($values['gdpr.enabled'] !== '1' || $values['gdpr.inactivity_enabled'] !== '1') return null;
+        return [
+            'months' => self::positiveInteger($values['gdpr.inactivity_months'], 120),
+            'warningDays' => self::positiveInteger($values['gdpr.inactivity_warning_days'], 30),
+            'mode' => $this->purgePolicy->effectiveMode($values['gdpr.deletion_mode'], $this->requirements->requiringAnonymization()),
+        ];
+    }
+
     private static function positiveInteger(?string $value, int $max): int
     {
         if ($value === null || !preg_match('/^[1-9][0-9]{0,2}$/D', $value) || (int) $value > $max) {

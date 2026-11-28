@@ -24,6 +24,10 @@ use SymSvel\Module\Gdpr\Consent\TrustedConsentOrigin;
 use SymSvel\Module\Gdpr\Consent\ConsentCreationLimiter;
 use SymSvel\Module\Gdpr\Controller\ConsentController;
 use SymSvel\Module\Gdpr\Command\CleanupConsentsCommand;
+use SymSvel\Module\Gdpr\Command\ProcessInactivityCommand;
+use SymSvel\Module\Gdpr\Retention\AccountRetentionOwnerRegistry;
+use SymSvel\Module\Gdpr\Retention\AccountErasureContributorRegistry;
+use SymSvel\Module\Gdpr\Retention\InactivityProcessor;
 use SymSvel\Module\Gdpr\Retention\PurgePolicy;
 use SymSvel\Module\Gdpr\Settings\GdprSettingDefinitionProvider;
 use SymSvel\Module\Gdpr\Settings\GdprConfiguration;
@@ -43,6 +47,12 @@ final class GdprBundle extends AbstractBundle
         $builder->register(InactivityNoticeRenderer::class)->setAutowired(true);
         $builder->register(InactivityNoticeRepository::class)->setAutowired(true);
         $builder->register(InactivityNoticeDispatch::class)->setAutowired(true);
+        $builder->register(AccountRetentionOwnerRegistry::class)
+            ->setArgument(0, new TaggedIteratorArgument('symsvel.gdpr.account_retention_owner'));
+        $builder->register(AccountErasureContributorRegistry::class)->setAutowired(true)
+            ->setArgument(1, new TaggedIteratorArgument('symsvel.gdpr.account_erasure_contributor'));
+        $builder->register(InactivityProcessor::class)->setAutowired(true);
+        $builder->register(ProcessInactivityCommand::class)->setAutowired(true)->addTag('console.command');
         $builder->register(ConsentPolicy::class);
         $builder->register(ConsentRepository::class)->setAutowired(true);
         $builder->register(ConsentCatalogue::class)

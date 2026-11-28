@@ -18,10 +18,19 @@ final readonly class InactivityNoticeRepository
     }
 
     /** @return array{attempt: string, claimed_at: \DateTimeImmutable, sent_at: ?\DateTimeImmutable}|null */
-    public function find(int $userId, string $cycle): ?array
+    public function find(int $userId, string $cycle, bool $lock = false): ?array
     {
         $this->validate($userId, $cycle);
-        $row = $this->db->fetchAssociative('SELECT attempt, claimed_at, sent_at FROM symsvel_gdpr_inactivity_notices WHERE user_id = ? AND cycle_hash = ?', [$userId, $cycle]);
+        $sql = 'SELECT attempt, claimed_at, sent_at FROM symsvel_gdpr_inactivity_notices WHERE user_id = ? AND cycle_hash = ?';
+        if ($lock) {
+            if (!$this->db->isTransactionActive()) throw new \LogicException('Notice lock requires the owner transaction.');
+            if ($this->db->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\SQLitePlatform) {
+                $this->db->executeStatement('UPDATE symsvel_gdpr_inactivity_notices SET cycle_hash = cycle_hash WHERE user_id = ? AND cycle_hash = ?', [$userId, $cycle]);
+            } else {
+                $sql .= ' FOR UPDATE';
+            }
+        }
+        $row = $this->db->fetchAssociative($sql, [$userId, $cycle]);
         if ($row === false) {
             return null;
         }
