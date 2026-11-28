@@ -91,3 +91,5 @@ Correctif CI du préavis : la fixture Settings reproduit la qualification native
 ## Raccordement facultatif Tracking (28/11/2026)
 
 Le runtime GDPR découvre uniquement l'entrée exacte `lib/modules/tracking/consent-consumer.ts` exportant `createConsentConsumer(scope, apiOrigin)`. Le contrat ConsentConsumerBridge conserve le dernier permit, attache une instance au montage, relaie les retraits synchroniquement et dispose le consommateur au démontage ou en cas d'erreur. Le consommateur doit arrêter ses propres effets sur null, ne jamais transmettre le jeton à un SDK et ne déclencher aucun effet à l'import. En l'absence de Tracking, le glob Vite est vide et le bandeau reste entièrement autonome. Aucun adaptateur chargé par ce commit : l'entrée Tracking doit encore être fournie et validée par des tests assemblés. Tests unitaires de présence/absence, publication/retrait et erreur.
+
+Correctif de la QA du pont optionnel : le scénario sans Tracking vérifie explicitement l'absence d'exception sur le cycle complet, conformément à la configuration Vitest de l'hôte imposant au moins une assertion par test. Aucun changement runtime.

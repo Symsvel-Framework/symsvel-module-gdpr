@@ -7,10 +7,12 @@ const permit: ConsentPermit = { credential: 'a'.repeat(64) + '.' + 'b'.repeat(64
 describe('optional consent consumer', () => {
   it('works without the optional module', () => {
     const bridge = new ConsentConsumerBridge();
-    bridge.attach(undefined, 'front', 'https://api.example.test');
-    bridge.publish(permit);
-    bridge.publish(null);
-    bridge.dispose();
+    expect(() => {
+      bridge.attach(undefined, 'front', 'https://api.example.test');
+      bridge.publish(permit);
+      bridge.publish(null);
+      bridge.dispose();
+    }).not.toThrow();
   });
   it('passes the current permit and synchronously forwards withdrawal', () => {
     const bridge = new ConsentConsumerBridge();
