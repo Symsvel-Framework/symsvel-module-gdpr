@@ -50,7 +50,13 @@ final class InactivityNoticeDispatchTest extends TestCase
             $registry = $this->createMock(ManagerRegistry::class);
             $registry->method('getManagerForClass')->with(Setting::class)->willReturn($em);
             $requirements = new AnonymizationRequirementRegistry([]);
-            $settings = new SettingManager(new SettingRegistry([new GdprSettingDefinitionProvider($requirements), new MailsSettingDefinitionProvider()]),
+            $definitions = new SettingRegistry([
+                GdprSettingDefinitionProvider::class => new GdprSettingDefinitionProvider($requirements),
+                MailsSettingDefinitionProvider::class => new MailsSettingDefinitionProvider(),
+            ], [GdprSettingDefinitionProvider::class => 'gdpr', MailsSettingDefinitionProvider::class => 'mails']);
+            self::assertNotNull($definitions->get('mails.sender_email'));
+            self::assertNull($definitions->get('sender_email'));
+            $settings = new SettingManager($definitions,
                 new SettingRepository($registry), $em, new SettingSecretCipher('gdpr-dispatch-test-secret'));
             $settings->set('mails.sender_email', 'sender@example.test');
             $settings->set('mails.sender_name', 'Example');
@@ -70,7 +76,8 @@ final class InactivityNoticeDispatchTest extends TestCase
             $mailer->method('send')->willReturnCallback(static function (RawMessage $message) use (&$sent): void {
                 ++$sent;
                 if ($sent === 2) throw new \RuntimeException('Ambiguous transport outcome.');
-                self::assertStringContainsString('https://app.example.test/login', $message->toString());
+                self::assertInstanceOf(\Symfony\Component\Mime\Email::class, $message);
+                self::assertStringContainsString('https://app.example.test/login', (string) $message->getTextBody());
             });
             $dispatch = new InactivityNoticeDispatch(new InactivityPolicy(), $cycles, $notices, new GdprConfiguration($settings, $requirements, new PurgePolicy()),
                 new TrustedConsentOrigin('https://app.example.test'), $renderer, new ConfiguredMailSender(new MailSender($mailer), $settings));
