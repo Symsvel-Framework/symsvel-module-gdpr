@@ -17,3 +17,7 @@ La commande `php bin/console symsvel:gdpr:process --env=prod` est une simulation
 ### Maintenance des préavis
 
 `php bin/console symsvel:gdpr:process --cleanup-notices --env=prod` est une simulation ; ajouter `--execute` pour supprimer seulement les tentatives devenues obsolètes. Les préavis courants ambigus restent bloquants, même anciens : examiner les journaux du transport avant toute réconciliation. Une réservation obsolète récente est protégée pendant 24 h. Cette opération ne traite aucun compte et n'envoie aucun mail.
+
+## Informations légales et droits
+
+Avant publication, compléter les clés `app.gdpr.dataText`, `app.gdpr.cookiesText`, `app.gdpr.rightsText`, `app.gdpr.rightsEmail` et leurs équivalents Front pour chaque langue utilisée, dans Languages. Publier les traductions et reconstruire les Sveltes. La page `/privacy` reste accessible sans compte et sans traceur ; l'adresse doit être une boîte de contact réellement surveillée. Le lien de contact ouvre la messagerie du visiteur, sans confirmation de réception. Le responsable organise les demandes, la vérification de l'identité, les délais, les justificatifs de conservation et la réponse. Le module ne traite pas automatiquement une demande de droit.

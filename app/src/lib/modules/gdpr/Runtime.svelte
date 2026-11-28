@@ -3,10 +3,15 @@
   import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import ConsentPanel from './ConsentPanel.svelte';
+  import { generatedTranslation } from '../../i18n/generated-translations';
+  import fr from '../../translations/gdpr/fr';
+  import en from '../../translations/gdpr/en';
   import type { Scope } from './consent-client';
   import { ConsentConsumerBridge, type ConsentConsumerFactory } from './consent-consumer';
 
   let { scope, language = 'fr' }: { scope: Scope; language?: string } = $props();
+  const policyLabel = $derived(generatedTranslation(language, scope + '.gdpr.policyLink')
+    ?? (language.toLowerCase().startsWith('en') ? en.policyLink : fr.policyLink));
   const bridge = new ConsentConsumerBridge();
   const apiOrigin = import.meta.env.PUBLIC_API_URL ?? '';
   // Tracking is optional. The exact entry is owned by Tracking and copied by Tooling.
@@ -38,3 +43,14 @@
 </script>
 
 <ConsentPanel {scope} {language} {apiOrigin} onPermitChange={value => bridge.publish(value)} onSelectionCommitted={() => bridge.selectionCommitted()} />
+
+{#if page.route.id !== '/privacy'}
+  <!-- The optional module owns this exact route; the host may build without it. -->
+  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+  <a class="policy-link" href="/privacy">{policyLabel}</a>
+{/if}
+
+<style>
+  .policy-link { position: fixed; bottom: .75rem; inset-inline-start: .75rem; z-index: 998; padding: .4rem .6rem; border: 1px solid currentColor; border-radius: .4rem; background: Canvas; color: LinkText; font-size: .8rem; max-width: 45%; }
+  .policy-link:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
+</style>

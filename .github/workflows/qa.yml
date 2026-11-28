@@ -41,6 +41,14 @@ jobs:
           cp "${{ matrix.scope }}/src/lib/translations/"*.ts assembled/src/lib/translations/gdpr/
           cp "${{ matrix.scope }}/tests/consent-client.test.ts" "${{ matrix.scope }}/tests/ConsentPanel.svelte.spec.ts" "${{ matrix.scope }}/tests/consent-consumer.test.ts" assembled/src/lib/modules/gdpr/
           cp "${{ matrix.scope }}/tests/privacy-runtime.e2e.ts" assembled/src/routes/
+          mkdir -p assembled/src/lib/modules/gdpr/routes/privacy assembled/src/routes/privacy
+          cp "${{ matrix.scope }}/src/routes/privacy/+page.svelte" assembled/src/lib/modules/gdpr/routes/privacy/+page.svelte
+          cat > assembled/src/routes/privacy/+page.svelte <<'ROUTE'
+          <script lang="ts">
+            import ModulePage from '#lib/modules/gdpr/routes/privacy/+page.svelte';
+          </script>
+          <ModulePage />
+          ROUTE
           # The Maker smoke test keeps its original module-relative import.
           mkdir -p assembled/src/lib/modules/gdpr-fixture/tests assembled/src/lib/modules/gdpr-fixture/src/lib/modules/gdpr
           cp "${{ matrix.scope }}/tests/gdpr.test.ts" assembled/src/lib/modules/gdpr-fixture/tests/

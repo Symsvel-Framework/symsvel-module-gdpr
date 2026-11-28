@@ -96,3 +96,20 @@ test('overlapping choices preserve the newer local blocker until explicit retry'
   expect(await blockers(other)).toEqual([]);
   expect(granted).toBe(false);
 });
+
+test('public privacy page remains available without tracking or account identity', async ({ page }) => {
+  let writes = 0;
+  await page.route('**/apiopen/project', route => route.fulfill({ json: { data: { name: 'GDPR CT' } } }));
+  await page.route('**/apiopen/gdpr/app/consent/state', route => route.fulfill({ json: { data: {
+    enabled: true, complete: false, version: null, expires_at: null, purposes: []
+  } } }));
+  await page.route('**/apiopen/gdpr/app/consent', route => { writes++; return route.abort(); });
+  await page.goto('http://localhost:4173/login');
+  await page.getByRole('link', { name: /Données personnelles et cookies|Personal data and cookies/ }).click();
+  await expect(page).toHaveURL(/\/privacy\/?$/);
+  await expect(page.getByRole('heading', { name: /Données personnelles et cookies|Personal data and cookies/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Exercer vos droits|Exercise your rights/ })).toBeVisible();
+  await expect(page.getByText(/n.a pas encore été configuré|has not been configured/)).toBeVisible();
+  expect(writes).toBe(0);
+  expect(await page.evaluate(() => localStorage.getItem('symsvel.gdpr.app'))).toBeNull();
+});

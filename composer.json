@@ -36,7 +36,8 @@
         },
         "branch-alias": {
             "dev-main": "1.0.x-dev",
-            "dev-dev": "0.1.x-dev"
+            "dev-dev": "1.0.x-dev",
+            "dev-feat/initial-architecture": "1.0.x-dev"
         }
     },
     "repositories": [
