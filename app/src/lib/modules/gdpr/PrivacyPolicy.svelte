@@ -30,7 +30,11 @@
     <h2>{label('rightsHeading')}</h2>
     <p>{label('rightsText')}</p>
     {#if contact}
-      <p><a href={contact}>{label('contactLabel')} ({address})</a></p>
+      <p>
+        <!-- Mailto is an external protocol, not a SvelteKit route. -->
+        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+        <a href={contact}>{label('contactLabel')} ({address})</a>
+      </p>
     {:else}
       <p>{label('contactUnavailable')}</p>
     {/if}
