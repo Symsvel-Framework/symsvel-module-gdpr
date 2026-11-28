@@ -2,7 +2,7 @@ import { page } from 'vitest/browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import ConsentPanel from './ConsentPanel.svelte';
-import type { ConsentState } from './consent-client';
+import type { ConsentState, ConsentPermit } from './consent-client';
 
 const credential = 'a'.repeat(64) + '.' + 'b'.repeat(64);
 const version = '1'.repeat(32);
@@ -37,6 +37,31 @@ describe('ConsentPanel', () => {
     await expect.element(page.getByRole('button', { name: 'Préférences cookies' })).toBeVisible();
     expect(localStorage.getItem('symsvel.gdpr.front')).toBe(credential);
     expect(localStorage.getItem('symsvel.gdpr.front.blocked')).toBeNull();
+  });
+
+  it('publishes a permit only after server confirmation and invalidates it before withdrawal', async () => {
+    const onPermitChange = vi.fn<(value: ConsentPermit | null) => void>();
+    let saved = false;
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      if (String(input).endsWith('/state')) return reply(saved ? current(true) : initial);
+      const granted = JSON.parse(String(init?.body)).choices['tracker-example'].granted;
+      if (granted) {
+        saved = true;
+        return reply({ ...current(true), credential });
+      }
+      expect(onPermitChange.mock.calls.at(-1)?.[0]).toBeNull();
+      return reply({ ...current(false), version: '2'.repeat(32) });
+    });
+    render(ConsentPanel, { scope: 'front', apiOrigin: 'https://api.example.test', language: 'fr', fetcher, onPermitChange });
+    await expect.element(page.getByRole('button', { name: 'Tout accepter' })).toBeVisible();
+    expect(onPermitChange.mock.calls.every(([value]) => value === null)).toBe(true);
+    await page.getByRole('button', { name: 'Tout accepter' }).click();
+    await expect.element(page.getByRole('button', { name: 'Préférences cookies' })).toBeVisible();
+    expect(onPermitChange.mock.calls.at(-1)?.[0]).toEqual({ credential, version, expiresAt: Date.parse(current(true).expires_at!) });
+    await page.getByRole('button', { name: 'Préférences cookies' }).click();
+    await page.getByRole('button', { name: 'Tout refuser' }).click();
+    await expect.element(page.getByRole('button', { name: 'Préférences cookies' })).toBeVisible();
+    expect(onPermitChange.mock.calls.at(-1)?.[0]).toBeNull();
   });
 
   it('allows withdrawal from preferences and keeps the block if the server is unavailable', async () => {

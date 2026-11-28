@@ -62,3 +62,5 @@ Le client de consentement est identique dans les deux scopes ; aucune dépendanc
 ## Premier écran de consentement
 
 Le composant Svelte identique App/Front affiche les choix et les préférences sans dépendance npm supplémentaire. Refus et acceptation ont une visibilité équivalente. Un échec de changement conserve un blocage local, les autres onglets et la reprise de visibilité déclenchent une relecture. Aucune publication de grant vers un loader à cette étape ; le contrat de montage hôte, l'arbitrage multi-onglets et le cycle d'arrêt des SDK seront traités avant activation réseau.
+
+Le passage de l'autorisation locale vers un consommateur se fait par callback explicite de ConsentPanel, sans événement global. Null invalide immédiatement le chargement avant toute écriture utilisateur, au changement de stockage, à l'expiration, en cas d'erreur ou au démontage. La revalidation périodique et au retour visible ne remplace pas le contrôle du Back ni l'arrêt effectif des fournisseurs. Aucun SDK n'est monté par cette brique.

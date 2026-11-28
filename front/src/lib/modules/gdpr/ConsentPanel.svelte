@@ -3,10 +3,10 @@
   import { generatedTranslation } from '../../i18n/generated-translations';
   import fr from '../../translations/gdpr/fr';
   import en from '../../translations/gdpr/en';
-  import { ConsentApi, ConsentHttpError, ConsentStorage, selection, type Scope, type ConsentState } from './consent-client';
+  import { ConsentApi, ConsentHttpError, ConsentStorage, selection, permit, type Scope, type ConsentState, type ConsentPermit } from './consent-client';
 
-  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch }: {
-    scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch;
+  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange }: {
+    scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch; onPermitChange?: (value: ConsentPermit | null) => void;
   } = $props();
 
   let consent = $state<ConsentState | null>(null);
@@ -14,12 +14,16 @@
   let busy = $state(false);
   let expanded = $state(false);
   let blocked = $state(false);
+  let expired = $state(false);
   let failure = $state<'unavailable' | 'conflict' | 'blocked' | null>(null);
   let api: ConsentApi | null = null;
   let store: ConsentStorage | null = null;
   let mounted = false;
   let generation = 0;
   let changedDuringSave = false;
+  let published: ConsentPermit | null | undefined;
+  let expiryTimer: number | undefined;
+  let refreshTimer: number | undefined;
 
   function label(key: keyof typeof fr): string {
     return generatedTranslation(language, scope + '.gdpr.' + key)
@@ -27,13 +31,36 @@
   }
 
   const offered = $derived(consent?.enabled === true && consent.purposes.length > 0);
-  const required = $derived(offered && (!consent?.complete || blocked));
+  const required = $derived(offered && (!consent?.complete || blocked || expired));
   const show = $derived(offered && (required || expanded));
+
+  function publish(value: ConsentPermit | null): void {
+    if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
+    expiryTimer = undefined;
+    const unchanged = published !== undefined && (published === null && value === null
+      || published !== null && value !== null && published.credential === value.credential
+      && published.version === value.version && published.expiresAt === value.expiresAt);
+    published = value;
+    if (!unchanged) onPermitChange?.(value);
+    if (value !== null) {
+      expiryTimer = window.setTimeout(() => {
+        if (value.expiresAt <= Date.now()) {
+          expired = true;
+          publish(null);
+          if (!busy) void refresh();
+        } else {
+          publish(value);
+        }
+      }, Math.max(0, Math.min(value.expiresAt - Date.now(), 2147483647)));
+    }
+  }
 
   function apply(value: ConsentState): void {
     consent = value;
     blocked = store?.blocked() ?? true;
-    draft = Object.fromEntries(value.purposes.map(p => [p.subject, !blocked && p.decided && p.granted]));
+    expired = value.expires_at !== null && Date.parse(value.expires_at) <= Date.now();
+    draft = Object.fromEntries(value.purposes.map(p => [p.subject, !blocked && !expired && p.decided && p.granted]));
+    publish(permit(value, store?.read() ?? null, blocked));
   }
 
   async function refresh(preserveFailure = false): Promise<void> {
@@ -41,7 +68,7 @@
     const revision = ++generation;
     if (!preserveFailure) failure = null;
     try {
-      const credential = store.read();
+      let credential = store.read();
       let value: ConsentState;
       try {
         value = await api.state(credential);
@@ -49,13 +76,21 @@
         if (!(error instanceof ConsentHttpError) || error.status !== 401 || credential === null) throw error;
         // A server-secret rotation or invalid credential requires a fresh explicit choice.
         if (revision !== generation || !mounted || store.read() !== credential) return;
+        publish(null);
         store.clearCredential();
+        credential = null;
         value = await api.state(null);
       }
       if (revision !== generation || !mounted) return;
+      if (store.read() !== credential) {
+        publish(null);
+        void refresh(preserveFailure);
+        return;
+      }
       apply(value);
     } catch {
       if (revision !== generation || !mounted) return;
+      publish(null);
       consent = null;
       blocked = true;
       failure = 'unavailable';
@@ -66,6 +101,7 @@
     if (!store || (event.key !== null && event.key !== store.key && event.key !== store.key + '.blocked')) return;
     // No stale UI selection may be saved against the changed browser state.
     generation++;
+    publish(null);
     blocked = true;
     if (busy) {
       changedDuringSave = true;
@@ -80,12 +116,14 @@
 
   onMount(() => {
     mounted = true;
+    publish(null);
     try {
       api = new ConsentApi(scope, apiOrigin, fetcher);
       store = new ConsentStorage(scope, window.localStorage);
       window.addEventListener('storage', externalChange);
       document.addEventListener('visibilitychange', revalidate);
       void refresh();
+      refreshTimer = window.setInterval(revalidate, 60000);
     } catch {
       failure = 'unavailable';
       blocked = true;
@@ -93,6 +131,8 @@
     return () => {
       mounted = false;
       generation++;
+      publish(null);
+      if (refreshTimer !== undefined) window.clearInterval(refreshTimer);
       window.removeEventListener('storage', externalChange);
       document.removeEventListener('visibilitychange', revalidate);
     };
@@ -106,6 +146,9 @@
     changedDuringSave = false;
     generation++;
     failure = null;
+    // Stop consumers synchronously, even if localStorage or the network fails.
+    publish(null);
+    blocked = true;
     try {
       const credential = store.read();
       store.block();
