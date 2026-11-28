@@ -29,6 +29,27 @@ describe('optional consent consumer', () => {
     bridge.publish(permit);
     expect(consumer.setPermit).toHaveBeenLastCalledWith(null);
   });
+  it('forwards the initial route before the permit and notifies durable selections', () => {
+    const bridge = new ConsentConsumerBridge();
+    const calls: string[] = [];
+    const consumer = {
+      routeChanged: vi.fn(() => { calls.push('route'); }),
+      setPermit: vi.fn(() => { calls.push('permit'); }),
+      requiresDocumentNavigation: vi.fn(() => true),
+      selectionCommitted: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const url = new URL('https://front.example.test/about');
+    bridge.routeChanged('/about', url);
+    bridge.publish(permit);
+    expect(bridge.requiresDocumentNavigation()).toBe(false);
+    bridge.attach(() => consumer, 'front', 'https://api.example.test');
+    expect(calls).toEqual(['route', 'permit']);
+    expect(consumer.routeChanged).toHaveBeenCalledWith('/about', url);
+    expect(bridge.requiresDocumentNavigation()).toBe(true);
+    bridge.selectionCommitted();
+    expect(consumer.selectionCommitted).toHaveBeenCalledOnce();
+  });
   it('disposes a broken consumer without breaking the consent UI', () => {
     const bridge = new ConsentConsumerBridge();
     const consumer = { setPermit: vi.fn(() => { throw new Error('Failure'); }), dispose: vi.fn() };

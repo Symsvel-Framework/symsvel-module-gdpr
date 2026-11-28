@@ -5,8 +5,8 @@
   import en from '../../translations/gdpr/en';
   import { ConsentApi, ConsentHttpError, ConsentStorage, selection, permit, type Scope, type ConsentState, type ConsentPermit } from './consent-client';
 
-  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange }: {
-    scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch; onPermitChange?: (value: ConsentPermit | null) => void;
+  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange, onSelectionCommitted }: {
+    scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch; onPermitChange?: (value: ConsentPermit | null) => void; onSelectionCommitted?: () => void;
   } = $props();
 
   let consent = $state<ConsentState | null>(null);
@@ -171,6 +171,7 @@
       store.commit(next);
       apply(value);
       expanded = false;
+      onSelectionCommitted?.();
     } catch (error) {
       if (mounted) failure = error instanceof ConsentHttpError && error.status === 409 ? 'conflict' : 'blocked';
     } finally {

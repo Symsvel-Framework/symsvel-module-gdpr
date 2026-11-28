@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
   import ConsentPanel from './ConsentPanel.svelte';
   import type { Scope } from './consent-client';
   import { ConsentConsumerBridge, type ConsentConsumerFactory } from './consent-consumer';
@@ -12,10 +13,20 @@
     eager: true, import: 'createConsentConsumer'
   })['../tracking/consent-consumer.ts'];
 
+  // Register during component initialization, not in a consumer's onMount callback.
+  beforeNavigate(navigation => {
+    if (navigation.willUnload || !navigation.to || !bridge.requiresDocumentNavigation()) return;
+    navigation.cancel();
+    window.location.assign(navigation.to.url.href);
+  });
+  afterNavigate(navigation => {
+    bridge.routeChanged(navigation.to.route.id, navigation.to.url);
+  });
+
   onMount(() => {
     bridge.attach(factory, scope, apiOrigin);
     return () => bridge.dispose();
   });
 </script>
 
-<ConsentPanel {scope} {language} {apiOrigin} onPermitChange={value => bridge.publish(value)} />
+<ConsentPanel {scope} {language} {apiOrigin} onPermitChange={value => bridge.publish(value)} onSelectionCommitted={() => bridge.selectionCommitted()} />
