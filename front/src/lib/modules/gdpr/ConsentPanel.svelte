@@ -156,6 +156,7 @@
           <div class="purpose">
             <label><input type="checkbox" bind:checked={draft[purpose.subject]} /> <strong>{purpose.name}</strong></label>
             <p>{purpose.purpose} : {purpose.description}</p>
+            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
             <a href={purpose.privacy_url} target="_blank" rel="noopener noreferrer">{label('privacy')}</a>
           </div>
         {/each}
