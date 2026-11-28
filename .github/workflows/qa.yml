@@ -34,11 +34,12 @@ jobs:
           cmp app/src/lib/modules/gdpr/consent-client.ts front/src/lib/modules/gdpr/consent-client.ts
           cmp app/src/lib/modules/gdpr/ConsentPanel.svelte front/src/lib/modules/gdpr/ConsentPanel.svelte
           cmp app/src/lib/modules/gdpr/Runtime.svelte front/src/lib/modules/gdpr/Runtime.svelte
+          cmp app/src/lib/modules/gdpr/consent-consumer.ts front/src/lib/modules/gdpr/consent-consumer.ts
           mkdir -p assembled/src/lib/modules/gdpr assembled/src/lib/translations/gdpr
           cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.ts assembled/src/lib/modules/gdpr/
           cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.svelte assembled/src/lib/modules/gdpr/
           cp "${{ matrix.scope }}/src/lib/translations/"*.ts assembled/src/lib/translations/gdpr/
-          cp "${{ matrix.scope }}/tests/consent-client.test.ts" "${{ matrix.scope }}/tests/ConsentPanel.svelte.spec.ts" assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/tests/consent-client.test.ts" "${{ matrix.scope }}/tests/ConsentPanel.svelte.spec.ts" "${{ matrix.scope }}/tests/consent-consumer.test.ts" assembled/src/lib/modules/gdpr/
           cp "${{ matrix.scope }}/tests/privacy-runtime.e2e.ts" assembled/src/routes/
           # The Maker smoke test keeps its original module-relative import.
           mkdir -p assembled/src/lib/modules/gdpr-fixture/tests assembled/src/lib/modules/gdpr-fixture/src/lib/modules/gdpr
@@ -52,7 +53,7 @@ jobs:
           npm run check
           npm run lint
           npm run build
-          npm run test:unit -- --run --project server src/lib/modules/gdpr/consent-client.test.ts src/lib/modules/gdpr-fixture/tests/gdpr.test.ts
+          npm run test:unit -- --run --project server src/lib/modules/gdpr/consent-client.test.ts src/lib/modules/gdpr/consent-consumer.test.ts src/lib/modules/gdpr-fixture/tests/gdpr.test.ts
           npx playwright install --with-deps chromium
           npm run test:unit -- --run --project client src/lib/modules/gdpr/ConsentPanel.svelte.spec.ts
       - working-directory: assembled
