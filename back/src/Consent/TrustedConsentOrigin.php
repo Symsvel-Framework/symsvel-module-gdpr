@@ -14,13 +14,24 @@ final readonly class TrustedConsentOrigin
     ) {
     }
 
-    public function allows(string $scope, ?string $origin): bool
+    public function configuredOrigin(string $scope): ?string
     {
-        $expected = match ($scope) {
+        $expected = $this->expected($scope);
+        return $this->allows($scope, $expected) ? $expected : null;
+    }
+
+    private function expected(string $scope): ?string
+    {
+        return match ($scope) {
             'app' => $this->appOrigin ?? self::environmentValue('SYMSVEL_APP_ORIGIN'),
             'front' => $this->frontOrigin ?? self::environmentValue('SYMSVEL_FRONT_ORIGIN'),
             default => null,
         };
+    }
+
+    public function allows(string $scope, ?string $origin): bool
+    {
+        $expected = $this->expected($scope);
         if ($expected === null || $origin === null || !hash_equals($expected, $origin)
             || !preg_match('~^https?://(?:[a-zA-Z0-9.-]+|\[::1\])(?::[0-9]{1,5})?$~D', $expected)) {
             return false;

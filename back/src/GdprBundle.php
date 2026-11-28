@@ -14,6 +14,7 @@ use SymSvel\Module\Gdpr\Retention\InactivityCycle;
 use SymSvel\Module\Gdpr\Mail\GdprMailTemplateProvider;
 use SymSvel\Module\Gdpr\Mail\InactivityNoticeRenderer;
 use SymSvel\Module\Gdpr\Retention\InactivityNoticeRepository;
+use SymSvel\Module\Gdpr\Retention\InactivityNoticeDispatch;
 use SymSvel\Module\Gdpr\Consent\ConsentPolicy;
 use SymSvel\Module\Gdpr\Consent\ConsentRepository;
 use SymSvel\Module\Gdpr\Consent\ConsentCatalogue;
@@ -41,6 +42,7 @@ final class GdprBundle extends AbstractBundle
         $builder->register(GdprMailTemplateProvider::class)->addTag('symsvel.mails.template_provider');
         $builder->register(InactivityNoticeRenderer::class)->setAutowired(true);
         $builder->register(InactivityNoticeRepository::class)->setAutowired(true);
+        $builder->register(InactivityNoticeDispatch::class)->setAutowired(true);
         $builder->register(ConsentPolicy::class);
         $builder->register(ConsentRepository::class)->setAutowired(true);
         $builder->register(ConsentCatalogue::class)
