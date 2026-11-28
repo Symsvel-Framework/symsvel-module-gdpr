@@ -68,3 +68,5 @@ Le passage de l'autorisation locale vers un consommateur se fait par callback ex
 ## Persistance du préavis
 
 Le cycle d'inactivité est identifié par HMAC de l'utilisateur, de son adresse, de l'activité UTC, des durées et du mode effectif. Une réservation unique par cycle précède l'envoi ; une date de transport confirmé est enregistrée avec comparaison de la tentative courante. Un échec certain peut être libéré, une tentative ambiguë ne déclenche jamais une opération irréversible et nécessite une réconciliation explicite. Cette table ne contient pas l'adresse en clair. Le nettoyage des cycles et le raccordement Mails/Users restent à réaliser. Aucun traitement automatique actif.
+
+Le layout natif App/Front monte uniquement l'entrée optionnelle exacte lib/modules/gdpr/Runtime.svelte par glob Vite. Le wrapper reste propriété de GDPR, synchronisé par Tooling sans remplacement de layout. L'hôte fournit seulement scope et langue ; aucun code métier ni SDK dans les layouts. Les CI autonomes et assemblées couvrent l'absence et la présence du module. Aucun chargement Tracking activé à cette étape.
