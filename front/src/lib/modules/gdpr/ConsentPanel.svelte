@@ -1,0 +1,291 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { generatedTranslation } from '../../i18n/generated-translations';
+  import fr from '../../translations/gdpr/fr';
+  import en from '../../translations/gdpr/en';
+  import { ConsentApi, ConsentHttpError, ConsentStorage, selection, permit, type Scope, type ConsentState, type ConsentPermit, type ConsentWrite } from './consent-client';
+
+  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange, onSelectionCommitted }: {
+    scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch; onPermitChange?: (value: ConsentPermit | null) => void; onSelectionCommitted?: () => void;
+  } = $props();
+
+  let consent = $state<ConsentState | null>(null);
+  let draft = $state<Record<string, boolean>>({});
+  let busy = $state(false);
+  let expanded = $state(false);
+  let blocked = $state(false);
+  let expired = $state(false);
+  let failure = $state<'unavailable' | 'conflict' | 'blocked' | null>(null);
+  let api: ConsentApi | null = null;
+  let store: ConsentStorage | null = null;
+  let mounted = false;
+  let generation = 0;
+  let changedDuringSave = false;
+  let activeAttempt: ConsentWrite | null = null;
+  let published: ConsentPermit | null | undefined;
+  let expiryTimer: number | undefined;
+  let refreshTimer: number | undefined;
+
+  function label(key: keyof typeof fr): string {
+    return generatedTranslation(language, scope + '.gdpr.' + key)
+      ?? (language.toLowerCase().startsWith('en') ? en[key] : fr[key]);
+  }
+
+  const offered = $derived(consent?.enabled === true && consent.purposes.length > 0);
+  const required = $derived(offered && (!consent?.complete || blocked || expired));
+  const show = $derived(offered && (required || expanded));
+
+  function publish(value: ConsentPermit | null): void {
+    if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
+    expiryTimer = undefined;
+    const unchanged = published !== undefined && (published === null && value === null
+      || published !== null && value !== null && published.credential === value.credential
+      && published.version === value.version && published.expiresAt === value.expiresAt);
+    published = value;
+    if (!unchanged) onPermitChange?.(value);
+    if (value !== null) {
+      expiryTimer = window.setTimeout(() => {
+        if (value.expiresAt <= Date.now()) {
+          expired = true;
+          publish(null);
+          if (!busy) void refresh();
+        } else {
+          publish(value);
+        }
+      }, Math.max(0, Math.min(value.expiresAt - Date.now(), 2147483647)));
+    }
+  }
+
+  function apply(value: ConsentState): void {
+    consent = value;
+    blocked = store?.blocked() ?? true;
+    expired = value.expires_at !== null && Date.parse(value.expires_at) <= Date.now();
+    draft = Object.fromEntries(value.purposes.map(p => [p.subject, !blocked && !expired && p.decided && p.granted]));
+    publish(permit(value, store?.read() ?? null, blocked));
+  }
+
+  async function refresh(preserveFailure = false): Promise<void> {
+    if (!api || !store || !mounted) return;
+    const revision = ++generation;
+    if (!preserveFailure) failure = null;
+    try {
+      let credential = store.read();
+      let value: ConsentState;
+      try {
+        value = await api.state(credential);
+      } catch (error) {
+        if (!(error instanceof ConsentHttpError) || error.status !== 401 || credential === null) throw error;
+        // A server-secret rotation or invalid credential requires a fresh explicit choice.
+        if (revision !== generation || !mounted || store.read() !== credential) return;
+        publish(null);
+        store.clearCredential();
+        credential = null;
+        value = await api.state(null);
+      }
+      if (revision !== generation || !mounted) return;
+      if (store.read() !== credential) {
+        publish(null);
+        void refresh(preserveFailure);
+        return;
+      }
+      apply(value);
+    } catch {
+      if (revision !== generation || !mounted) return;
+      publish(null);
+      consent = null;
+      blocked = true;
+      failure = 'unavailable';
+    }
+  }
+
+  function externalChange(event: StorageEvent): void {
+    if (!store || !store.affects(event.key)) return;
+    // No stale UI selection may be saved against the changed browser state.
+    generation++;
+    publish(null);
+    blocked = true;
+    if (busy) {
+      changedDuringSave = true;
+      return;
+    }
+    void refresh();
+  }
+
+  function revalidate(): void {
+    if (document.visibilityState === 'visible' && !busy) void refresh();
+  }
+
+  function suspend(): void {
+    generation++;
+    publish(null);
+    if (busy) changedDuringSave = true;
+    // A suspended/destroyed document must never commit an old response on restore.
+    if (activeAttempt && store) {
+      try { store.fail(activeAttempt); } catch { blocked = true; }
+    }
+  }
+
+  function restore(event: PageTransitionEvent): void {
+    if (!event.persisted) return;
+    publish(null);
+    if (!busy) void refresh();
+  }
+
+  onMount(() => {
+    mounted = true;
+    publish(null);
+    try {
+      api = new ConsentApi(scope, apiOrigin, fetcher);
+      store = new ConsentStorage(scope, window.localStorage);
+      window.addEventListener('storage', externalChange);
+      window.addEventListener('pagehide', suspend);
+      window.addEventListener('pageshow', restore);
+      document.addEventListener('visibilitychange', revalidate);
+      void refresh();
+      refreshTimer = window.setInterval(revalidate, 60000);
+    } catch {
+      failure = 'unavailable';
+      blocked = true;
+    }
+    return () => {
+      mounted = false;
+      suspend();
+      if (refreshTimer !== undefined) window.clearInterval(refreshTimer);
+      window.removeEventListener('storage', externalChange);
+      window.removeEventListener('pagehide', suspend);
+      window.removeEventListener('pageshow', restore);
+      document.removeEventListener('visibilitychange', revalidate);
+    };
+  });
+
+  async function save(mode: 'accept' | 'refuse' | 'custom'): Promise<void> {
+    if (!api || !store || !consent?.enabled || !consent.purposes.length || busy) return;
+    const current = consent;
+    const choices = selection(current, p => mode === 'accept' || (mode === 'custom' && draft[p.subject] === true));
+    busy = true;
+    changedDuringSave = false;
+    generation++;
+    failure = null;
+    // Stop consumers synchronously, even if localStorage or the network fails.
+    publish(null);
+    blocked = true;
+    const storage = store;
+    const service = api;
+    try {
+      const attempt = storage.begin();
+      activeAttempt = attempt;
+      const write = async (exclusive: boolean): Promise<void> => {
+        if (!mounted || changedDuringSave || !storage.canWrite(attempt, exclusive)) {
+          failure = 'conflict';
+          return;
+        }
+        const credential = storage.read();
+        const value = await service.save(credential, current.version, choices);
+        if (!mounted) return;
+        if (changedDuringSave || storage.read() !== credential || !storage.canWrite(attempt, exclusive)) {
+          failure = 'conflict';
+          return;
+        }
+        if (!value.enabled || !value.complete || value.version === null) throw new Error('Unconfirmed consent.');
+        const next = value.credential ?? credential;
+        if (!next) throw new Error('Missing consent credential.');
+        if (value.purposes.length !== Object.keys(choices).length
+          || value.purposes.some(p => choices[p.subject]?.revision !== p.revision || choices[p.subject]?.granted !== p.granted)
+          || !storage.commit(next, attempt, exclusive)) {
+          failure = 'conflict';
+          return;
+        }
+        apply(value);
+        if (blocked) {
+          failure = 'conflict';
+          return;
+        }
+        expanded = false;
+        onSelectionCommitted?.();
+      };
+      // Secure contexts serialize explicit writes across tabs. The marker is
+      // recorded before acquisition so a competing intent immediately blocks SDKs.
+      if (navigator.locks) {
+        await navigator.locks.request(storage.key, { ifAvailable: true }, async lock => {
+          if (!lock) { failure = 'conflict'; return; }
+          await write(true);
+        });
+      } else {
+        await write(false);
+      }
+    } catch (error) {
+      if (mounted) failure = error instanceof ConsentHttpError && error.status === 409 ? 'conflict' : 'blocked';
+    } finally {
+      if (activeAttempt) {
+        try { storage.fail(activeAttempt); } catch {
+          publish(null);
+          blocked = true;
+          if (mounted) failure = 'blocked';
+        }
+      }
+      activeAttempt = null;
+      busy = false;
+      if (mounted && failure !== null) await refresh(true);
+    }
+  }
+
+  function customize(): void {
+    expanded = true;
+  }
+</script>
+
+{#if offered && !show}
+  <button type="button" class="preferences" onclick={customize}>{label('preferences')}</button>
+{/if}
+{#if show && consent}
+  <section class="consent-panel" aria-label={label('title')}>
+    <h2>{label('title')}</h2>
+    <p>{label('intro')}</p>
+    {#if failure}<p class="feedback" role="alert">{label(failure)}</p>{/if}
+    {#if expanded}
+      <fieldset disabled={busy}>
+        <legend>{label('customize')}</legend>
+        {#each consent.purposes as purpose (purpose.subject)}
+          <div class="purpose">
+            <label><input type="checkbox" bind:checked={draft[purpose.subject]} /> <strong>{purpose.name}</strong></label>
+            <p>{purpose.purpose} : {purpose.description}</p>
+            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+            <a href={purpose.privacy_url} target="_blank" rel="noopener noreferrer">{label('privacy')}</a>
+          </div>
+        {/each}
+      </fieldset>
+    {/if}
+    <div class="actions">
+      <button type="button" disabled={busy} onclick={() => void save('accept')}>{label('accept')}</button>
+      <button type="button" disabled={busy} onclick={() => void save('refuse')}>{label('refuse')}</button>
+      {#if expanded}
+        <button type="button" disabled={busy} onclick={() => void save('custom')}>{label('save')}</button>
+        {#if !required}<button type="button" disabled={busy} onclick={() => expanded = false}>{label('cancel')}</button>{/if}
+      {:else}
+        <button type="button" disabled={busy} onclick={customize}>{label('customize')}</button>
+      {/if}
+    </div>
+    {#if busy}<p role="status">{label('saving')}</p>{/if}
+  </section>
+{:else if failure}
+  <section class="consent-panel" aria-label={label('title')}>
+    <p role="alert">{label(failure)}</p>
+    <button type="button" onclick={() => void refresh()}>{label('retry')}</button>
+  </section>
+{/if}
+
+<style>
+  .consent-panel { position: fixed; inset-inline: max(1rem, calc((100vw - 48rem) / 2)); bottom: 1rem; z-index: 1000; max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.25rem; border-radius: .75rem; border: 1px solid #6b7280; background: Canvas; color: CanvasText; box-shadow: 0 .25rem 1.5rem #0003; text-align: start; }
+  h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
+  p { margin: .5rem 0; line-height: 1.5; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+  button { font: inherit; padding: .6rem .85rem; border: 1px solid currentColor; border-radius: .4rem; background: Canvas; color: CanvasText; cursor: pointer; }
+  button:disabled { opacity: .55; cursor: default; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
+  .preferences { position: fixed; bottom: .75rem; inset-inline-end: .75rem; z-index: 999; font-size: .85rem; }
+  fieldset { border: 1px solid #6b7280; border-radius: .4rem; margin: .75rem 0; padding: .75rem; }
+  .purpose + .purpose { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid #6b7280; }
+  .purpose label { display: flex; gap: .5rem; align-items: center; }
+  .purpose a { color: LinkText; }
+  .feedback { font-weight: 600; }
+</style>

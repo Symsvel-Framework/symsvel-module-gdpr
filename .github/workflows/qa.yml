@@ -8,5 +8,82 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: pdo_sqlite
       - run: composer install --no-interaction --prefer-dist
       - run: composer qa
+  browser-client:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scope: [app, front]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Symsvel-Framework/symsvel-${{ matrix.scope }}
+          ref: dev
+          path: assembled
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: assembled/package-lock.json
+      - name: Assemble module client
+        run: |
+          cmp app/src/lib/modules/gdpr/consent-client.ts front/src/lib/modules/gdpr/consent-client.ts
+          cmp app/src/lib/modules/gdpr/ConsentPanel.svelte front/src/lib/modules/gdpr/ConsentPanel.svelte
+          cmp app/src/lib/modules/gdpr/Runtime.svelte front/src/lib/modules/gdpr/Runtime.svelte
+          cmp app/src/lib/modules/gdpr/consent-consumer.ts front/src/lib/modules/gdpr/consent-consumer.ts
+          mkdir -p assembled/src/lib/modules/gdpr assembled/src/lib/translations/gdpr
+          cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.ts assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.svelte assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/src/lib/translations/"*.ts assembled/src/lib/translations/gdpr/
+          cp "${{ matrix.scope }}/tests/consent-client.test.ts" "${{ matrix.scope }}/tests/ConsentPanel.svelte.spec.ts" "${{ matrix.scope }}/tests/consent-consumer.test.ts" assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/tests/privacy-runtime.e2e.ts" assembled/src/routes/
+          mkdir -p assembled/src/lib/modules/gdpr/routes/privacy assembled/src/routes/privacy
+          cp "${{ matrix.scope }}/src/routes/privacy/+page.svelte" assembled/src/lib/modules/gdpr/routes/privacy/+page.svelte
+          cat > assembled/src/routes/privacy/+page.svelte <<'ROUTE'
+          <script lang="ts">
+            import ModulePage from '#lib/modules/gdpr/routes/privacy/+page.svelte';
+          </script>
+          <ModulePage />
+          ROUTE
+          # The Maker smoke test keeps its original module-relative import.
+          mkdir -p assembled/src/lib/modules/gdpr-fixture/tests assembled/src/lib/modules/gdpr-fixture/src/lib/modules/gdpr
+          cp "${{ matrix.scope }}/tests/gdpr.test.ts" assembled/src/lib/modules/gdpr-fixture/tests/
+          cp "${{ matrix.scope }}/src/lib/modules/gdpr/index.ts" assembled/src/lib/modules/gdpr-fixture/src/lib/modules/gdpr/
+      - working-directory: assembled
+        run: npm ci --no-audit --no-fund
+      - working-directory: assembled
+        run: |
+          npm run format
+          npm run check
+          npm run lint
+          npm run build
+          npm run test:unit -- --run --project server src/lib/modules/gdpr/consent-client.test.ts src/lib/modules/gdpr/consent-consumer.test.ts src/lib/modules/gdpr-fixture/tests/gdpr.test.ts
+          npx playwright install --with-deps chromium
+          npm run test:unit -- --run --project client src/lib/modules/gdpr/ConsentPanel.svelte.spec.ts
+      - working-directory: assembled
+        env:
+          PUBLIC_API_URL: http://localhost:4173
+        run: npx playwright test src/routes/privacy-runtime.e2e.ts
+      - name: Assemble synthetic optional consumer
+        run: |
+          mkdir -p assembled/src/lib/modules/tracking
+          cp tests/fixtures/consent-consumer.ts assembled/src/lib/modules/tracking/
+          cp "${{ matrix.scope }}/tests/privacy-consumer.e2e.ts" assembled/src/routes/
+      - working-directory: assembled
+        env:
+          PUBLIC_API_URL: http://localhost:4173
+        run: |
+          npm run format
+          npm run check
+          npm run lint
+          npx playwright test src/routes/privacy-consumer.e2e.ts --trace retain-on-failure
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gdpr-browser-${{ matrix.scope }}
+          path: assembled/test-results/
+          if-no-files-found: ignore

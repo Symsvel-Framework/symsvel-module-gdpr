@@ -1,8 +1,15 @@
 {
     "schema": 1,
     "name": "Gdpr",
-    "dependencies": {},
-    "tables": [],
+    "dependencies": {
+        "settings": "*",
+        "mails": "*"
+    },
+    "tables": [
+        "symsvel_gdpr_consents",
+        "symsvel_gdpr_creation_limits",
+        "symsvel_gdpr_inactivity_notices"
+    ],
     "components": {
         "back": "back",
         "bo": "bo",
