@@ -2,7 +2,7 @@ import { page } from 'vitest/browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import ConsentPanel from './ConsentPanel.svelte';
-import type { ConsentState, ConsentPermit } from './consent-client';
+import { ConsentStorage, type ConsentState, type ConsentPermit } from './consent-client';
 
 const credential = 'a'.repeat(64) + '.' + 'b'.repeat(64);
 const version = '1'.repeat(32);
@@ -36,7 +36,7 @@ describe('ConsentPanel', () => {
     await page.getByRole('button', { name: 'Tout refuser' }).click();
     await expect.element(page.getByRole('button', { name: 'Préférences cookies' })).toBeVisible();
     expect(localStorage.getItem('symsvel.gdpr.front')).toBe(credential);
-    expect(localStorage.getItem('symsvel.gdpr.front.blocked')).toBeNull();
+    expect(new ConsentStorage('front', localStorage).blocked()).toBe(false);
   });
 
   it('publishes a permit only after server confirmation and invalidates it before withdrawal', async () => {
@@ -69,7 +69,7 @@ describe('ConsentPanel', () => {
     const fetcher = vi.fn<typeof fetch>(async (input, init) => {
       if (String(input).endsWith('/state')) return reply(current(true));
       expect(JSON.parse(String(init?.body)).choices['tracker-example'].granted).toBe(false);
-      expect(localStorage.getItem('symsvel.gdpr.front.blocked')).toBe('1');
+      expect(new ConsentStorage('front', localStorage).blocked()).toBe(true);
       return new Response('{}', { status: 503 });
     });
     render(ConsentPanel, { scope: 'front', apiOrigin: 'https://api.example.test', language: 'fr', fetcher });
@@ -78,6 +78,6 @@ describe('ConsentPanel', () => {
     await page.getByRole('button', { name: 'Tout refuser' }).click();
     await expect.element(page.getByRole('alert')).toHaveTextContent('La modification');
     await expect.element(page.getByRole('checkbox')).not.toBeChecked();
-    expect(localStorage.getItem('symsvel.gdpr.front.blocked')).toBe('1');
+    expect(new ConsentStorage('front', localStorage).blocked()).toBe(true);
   });
 });

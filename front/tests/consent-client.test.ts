@@ -35,19 +35,77 @@ describe('consent client', () => {
     expect(permit(current, credential, false, Date.parse(current.expires_at!))).toBeNull();
     expect(permit({ ...current, purposes: [{ ...current.purposes[0], granted: false }] }, credential, false)).toBeNull();
   });
+  function sharedStorage(values = new Map<string, string>()) {
+    return { values, storage: {
+      get length() { return values.size; },
+      key: (index: number) => [...values.keys()][index] ?? null,
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); }
+    } };
+  }
   it('writes no browser storage until explicit choice and keeps a local block on failed changes', () => {
-    const values = new Map<string, string>();
-    const storage = new ConsentStorage('front', { getItem: key => values.get(key) ?? null,
-      setItem: (key, value) => { values.set(key, value); }, removeItem: key => { values.delete(key); } });
+    const { values, storage: raw } = sharedStorage();
+    const storage = new ConsentStorage('front', raw);
     expect(storage.read()).toBeNull();
     expect(values.size).toBe(0);
-    storage.commit(credential);
+    expect(storage.commit(credential, storage.begin(), false)).toBe(true);
     expect(storage.read()).toBe(credential);
-    storage.block();
+    const failed = storage.begin();
+    storage.fail(failed);
     expect(storage.blocked()).toBe(true);
     expect(permit(current, storage.read(), storage.blocked())).toBeNull();
-    storage.commit(credential);
+    expect(storage.commit(credential, storage.begin(), false)).toBe(true);
     expect(storage.blocked()).toBe(false);
+  });
+  it('never lets an older response clear a later explicit block, with or without a lock', () => {
+    for (const exclusive of [false, true]) {
+      const { storage: raw } = sharedStorage();
+      const first = new ConsentStorage('front', raw);
+      const second = new ConsentStorage('front', raw);
+      const older = first.begin();
+      const newer = second.begin();
+      expect(first.canWrite(older, exclusive)).toBe(false);
+      expect(first.commit(credential, older, exclusive)).toBe(false);
+      expect(second.blocked()).toBe(true);
+      expect(first.read()).toBeNull();
+      first.fail(older);
+      second.fail(newer);
+      const retry = second.begin();
+      expect(second.commit(credential, retry, exclusive)).toBe(true);
+      expect(first.blocked()).toBe(false);
+      expect(first.commit('c'.repeat(64) + '.' + 'd'.repeat(64), older, exclusive)).toBe(false);
+      expect(first.read()).toBe(credential);
+    }
+  });
+  it('does not take over a pending write without native exclusive ownership', () => {
+    const { storage: raw } = sharedStorage();
+    const first = new ConsentStorage('front', raw);
+    const second = new ConsentStorage('front', raw);
+    first.begin();
+    const later = second.begin();
+    expect(second.canWrite(later, false)).toBe(false);
+    expect(second.canWrite(later, true)).toBe(true);
+    expect(second.affects(later.marker)).toBe(true);
+    expect(second.affects('symsvel.gdpr.app.blocked.example')).toBe(false);
+    expect(second.affects(null)).toBe(true);
+  });
+  it('supports legacy blockers and leaves a newly inserted blocker intact during commit', () => {
+    const { values, storage: raw } = sharedStorage();
+    values.set('symsvel.gdpr.front.blocked', '1');
+    const storage = new ConsentStorage('front', {
+      ...raw,
+      get length() { return values.size; },
+      setItem(key, value) {
+        raw.setItem(key, value);
+        if (key === 'symsvel.gdpr.front') raw.setItem(key + '.blocked.concurrent', 'pending');
+      }
+    });
+    const attempt = storage.begin();
+    expect(storage.commit(credential, attempt, false)).toBe(false);
+    expect(storage.blocked()).toBe(true);
+    expect(values.has('symsvel.gdpr.front.blocked.concurrent')).toBe(true);
+    expect(values.has('symsvel.gdpr.front.blocked')).toBe(false);
   });
   it('rejects foreign insecure origins and unexpected credentials on state reads', async () => {
     expect(() => new ConsentApi('front', 'http://api.example.com')).toThrow();

@@ -3,7 +3,7 @@
   import { generatedTranslation } from '../../i18n/generated-translations';
   import fr from '../../translations/gdpr/fr';
   import en from '../../translations/gdpr/en';
-  import { ConsentApi, ConsentHttpError, ConsentStorage, selection, permit, type Scope, type ConsentState, type ConsentPermit } from './consent-client';
+  import { ConsentApi, ConsentHttpError, ConsentStorage, selection, permit, type Scope, type ConsentState, type ConsentPermit, type ConsentWrite } from './consent-client';
 
   let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange, onSelectionCommitted }: {
     scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch; onPermitChange?: (value: ConsentPermit | null) => void; onSelectionCommitted?: () => void;
@@ -21,6 +21,7 @@
   let mounted = false;
   let generation = 0;
   let changedDuringSave = false;
+  let activeAttempt: ConsentWrite | null = null;
   let published: ConsentPermit | null | undefined;
   let expiryTimer: number | undefined;
   let refreshTimer: number | undefined;
@@ -98,7 +99,7 @@
   }
 
   function externalChange(event: StorageEvent): void {
-    if (!store || (event.key !== null && event.key !== store.key && event.key !== store.key + '.blocked')) return;
+    if (!store || !store.affects(event.key)) return;
     // No stale UI selection may be saved against the changed browser state.
     generation++;
     publish(null);
@@ -114,6 +115,22 @@
     if (document.visibilityState === 'visible' && !busy) void refresh();
   }
 
+  function suspend(): void {
+    generation++;
+    publish(null);
+    if (busy) changedDuringSave = true;
+    // A suspended/destroyed document must never commit an old response on restore.
+    if (activeAttempt && store) {
+      try { store.fail(activeAttempt); } catch { blocked = true; }
+    }
+  }
+
+  function restore(event: PageTransitionEvent): void {
+    if (!event.persisted) return;
+    publish(null);
+    if (!busy) void refresh();
+  }
+
   onMount(() => {
     mounted = true;
     publish(null);
@@ -121,6 +138,8 @@
       api = new ConsentApi(scope, apiOrigin, fetcher);
       store = new ConsentStorage(scope, window.localStorage);
       window.addEventListener('storage', externalChange);
+      window.addEventListener('pagehide', suspend);
+      window.addEventListener('pageshow', restore);
       document.addEventListener('visibilitychange', revalidate);
       void refresh();
       refreshTimer = window.setInterval(revalidate, 60000);
@@ -130,10 +149,11 @@
     }
     return () => {
       mounted = false;
-      generation++;
-      publish(null);
+      suspend();
       if (refreshTimer !== undefined) window.clearInterval(refreshTimer);
       window.removeEventListener('storage', externalChange);
+      window.removeEventListener('pagehide', suspend);
+      window.removeEventListener('pageshow', restore);
       document.removeEventListener('visibilitychange', revalidate);
     };
   });
@@ -149,32 +169,61 @@
     // Stop consumers synchronously, even if localStorage or the network fails.
     publish(null);
     blocked = true;
+    const storage = store;
+    const service = api;
     try {
-      const credential = store.read();
-      store.block();
-      blocked = true;
-      const value = await api.save(credential, current.version, choices);
-      if (!mounted) return;
-      if (changedDuringSave || store.read() !== credential) {
-        failure = 'conflict';
-        return;
+      const attempt = storage.begin();
+      activeAttempt = attempt;
+      const write = async (exclusive: boolean): Promise<void> => {
+        if (!mounted || changedDuringSave || !storage.canWrite(attempt, exclusive)) {
+          failure = 'conflict';
+          return;
+        }
+        const credential = storage.read();
+        const value = await service.save(credential, current.version, choices);
+        if (!mounted) return;
+        if (changedDuringSave || storage.read() !== credential || !storage.canWrite(attempt, exclusive)) {
+          failure = 'conflict';
+          return;
+        }
+        if (!value.enabled || !value.complete || value.version === null) throw new Error('Unconfirmed consent.');
+        const next = value.credential ?? credential;
+        if (!next) throw new Error('Missing consent credential.');
+        if (value.purposes.length !== Object.keys(choices).length
+          || value.purposes.some(p => choices[p.subject]?.revision !== p.revision || choices[p.subject]?.granted !== p.granted)
+          || !storage.commit(next, attempt, exclusive)) {
+          failure = 'conflict';
+          return;
+        }
+        apply(value);
+        if (blocked) {
+          failure = 'conflict';
+          return;
+        }
+        expanded = false;
+        onSelectionCommitted?.();
+      };
+      // Secure contexts serialize explicit writes across tabs. The marker is
+      // recorded before acquisition so a competing intent immediately blocks SDKs.
+      if (navigator.locks) {
+        await navigator.locks.request(storage.key, { ifAvailable: true }, async lock => {
+          if (!lock) { failure = 'conflict'; return; }
+          await write(true);
+        });
+      } else {
+        await write(false);
       }
-      if (!value.enabled || !value.complete || value.version === null) throw new Error('Unconfirmed consent.');
-      const next = value.credential ?? credential;
-      if (!next) throw new Error('Missing consent credential.');
-      // Never clear the local block if the catalogue or effective choices changed.
-      if (value.purposes.length !== Object.keys(choices).length
-        || value.purposes.some(p => choices[p.subject]?.revision !== p.revision || choices[p.subject]?.granted !== p.granted)) {
-        failure = 'conflict';
-        return;
-      }
-      store.commit(next);
-      apply(value);
-      expanded = false;
-      onSelectionCommitted?.();
     } catch (error) {
       if (mounted) failure = error instanceof ConsentHttpError && error.status === 409 ? 'conflict' : 'blocked';
     } finally {
+      if (activeAttempt) {
+        try { storage.fail(activeAttempt); } catch {
+          publish(null);
+          blocked = true;
+          if (mounted) failure = 'blocked';
+        }
+      }
+      activeAttempt = null;
       busy = false;
       if (mounted && failure !== null) await refresh(true);
     }

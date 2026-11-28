@@ -91,22 +91,63 @@ export function selection(state: ConsentState, granted: (purpose: Purpose) => bo
 }
 
 /** Browser storage is optional and used only for the dedicated consent credential. */
+export type ConsentWrite = { marker: string; previous: readonly string[] };
+
 export class ConsentStorage {
   readonly key: string;
-  constructor(scope: Scope, private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>) {
+  private readonly blockKey: string;
+  constructor(scope: Scope, private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'length' | 'key'>) {
     this.key = 'symsvel.gdpr.' + scope;
+    this.blockKey = this.key + '.blocked';
   }
   read(): string | null {
     const value = this.storage.getItem(this.key);
     return isCredential(value) ? value : null;
   }
-  blocked(): boolean { return this.storage.getItem(this.key + '.blocked') === '1'; }
-  block(): void { this.storage.setItem(this.key + '.blocked', '1'); }
+  private isBlockKey(key: string): boolean {
+    return key === this.blockKey || key.startsWith(this.blockKey + '.');
+  }
+  affects(key: string | null): boolean {
+    return key === null || key === this.key || this.isBlockKey(key);
+  }
+  private blocks(): string[] {
+    const keys: string[] = [];
+    for (let i = 0; i < this.storage.length; i++) {
+      const key = this.storage.key(i);
+      if (key !== null && this.isBlockKey(key)) keys.push(key);
+    }
+    return keys;
+  }
+  blocked(): boolean { return this.blocks().length > 0; }
+  begin(): ConsentWrite {
+    // Each explicit intent owns a different durable blocker, even without Web Locks.
+    const previous = this.blocks();
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+    const marker = this.blockKey + '.' + nonce;
+    this.storage.setItem(marker, 'pending');
+    return { marker, previous };
+  }
+  canWrite(attempt: ConsentWrite, exclusive: boolean): boolean {
+    const expected = new Set([...attempt.previous, attempt.marker]);
+    const actual = this.blocks();
+    return this.storage.getItem(attempt.marker) === 'pending'
+      && actual.length === expected.size && actual.every(key => expected.has(key))
+      // An exclusive browser lock proves that older pending attempts are abandoned.
+      // In non-secure local development, never take ownership of another pending write.
+      && (exclusive || attempt.previous.every(key => this.storage.getItem(key) !== 'pending'));
+  }
+  fail(attempt: ConsentWrite): void {
+    if (this.storage.getItem(attempt.marker) === 'pending') this.storage.setItem(attempt.marker, 'failed');
+  }
   clearCredential(): void { this.storage.removeItem(this.key); }
-  commit(credential: string): void {
+  commit(credential: string, attempt: ConsentWrite, exclusive: boolean): boolean {
     if (!isCredential(credential)) throw new Error('Invalid consent credential.');
+    if (!this.canWrite(attempt, exclusive)) return false;
     this.storage.setItem(this.key, credential);
-    this.storage.removeItem(this.key + '.blocked');
+    // Never remove a blocker created after this explicit choice, even during commit.
+    for (const key of attempt.previous) this.storage.removeItem(key);
+    this.storage.removeItem(attempt.marker);
+    return !this.blocked();
   }
 }
 export function permit(state: ConsentState | null, credential: string | null, blocked: boolean, now = Date.now()): ConsentPermit | null {
