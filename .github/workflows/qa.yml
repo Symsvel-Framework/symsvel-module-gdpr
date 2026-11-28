@@ -72,4 +72,10 @@ jobs:
           npm run format
           npm run check
           npm run lint
-          npx playwright test src/routes/privacy-consumer.e2e.ts
+          npx playwright test src/routes/privacy-consumer.e2e.ts --trace retain-on-failure
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gdpr-browser-${{ matrix.scope }}
+          path: assembled/test-results/
+          if-no-files-found: ignore
