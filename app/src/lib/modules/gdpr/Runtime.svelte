@@ -20,7 +20,7 @@
     window.location.assign(navigation.to.url.href);
   });
   afterNavigate(navigation => {
-    bridge.routeChanged(navigation.to.route.id, navigation.to.url);
+    bridge.routeChanged(navigation.to?.route.id ?? null, navigation.to?.url ?? new URL(window.location.href));
   });
 
   onMount(() => {
