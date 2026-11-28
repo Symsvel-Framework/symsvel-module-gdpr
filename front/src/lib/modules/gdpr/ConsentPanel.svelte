@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, setContext, type Snippet } from 'svelte';
   import { generatedTranslation } from '../../i18n/generated-translations';
   import fr from '../../translations/gdpr/fr';
   import en from '../../translations/gdpr/en';
   import { ConsentApi, ConsentHttpError, ConsentStorage, selection, permit, type Scope, type ConsentState, type ConsentPermit, type ConsentWrite } from './consent-client';
 
-  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange, onSelectionCommitted }: {
+  let { scope, apiOrigin = import.meta.env.PUBLIC_API_URL ?? '', language = 'fr', fetcher = fetch, onPermitChange, onSelectionCommitted, children, inline = false, showFooter = true }: {
     scope: Scope; apiOrigin?: string; language?: string; fetcher?: typeof fetch; onPermitChange?: (value: ConsentPermit | null) => void; onSelectionCommitted?: () => void;
+    children?: Snippet; inline?: boolean; showFooter?: boolean;
   } = $props();
 
   let consent = $state<ConsentState | null>(null);
@@ -34,6 +35,8 @@
   const offered = $derived(consent?.enabled === true && consent.purposes.length > 0);
   const required = $derived(offered && (!consent?.complete || blocked || expired));
   const show = $derived(offered && (required || expanded));
+  setContext<Snippet>('symsvel.gdpr.preferences', inlineContent);
+  $effect(() => { if (inline || !showFooter) expanded = false; });
 
   function publish(value: ConsentPermit | null): void {
     if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
@@ -234,48 +237,89 @@
   }
 </script>
 
-{#if offered && !show}
-  <button type="button" class="preferences" onclick={customize}>{label('preferences')}</button>
-{/if}
-{#if show && consent}
-  <section class="consent-panel" aria-label={label('title')}>
-    <h2>{label('title')}</h2>
-    <p>{label('intro')}</p>
-    {#if failure}<p class="feedback" role="alert">{label(failure)}</p>{/if}
-    {#if expanded}
-      <fieldset disabled={busy}>
-        <legend>{label('customize')}</legend>
-        {#each consent.purposes as purpose (purpose.subject)}
-          <div class="purpose">
-            <label><input type="checkbox" bind:checked={draft[purpose.subject]} /> <strong>{purpose.name}</strong></label>
-            <p>{purpose.purpose} : {purpose.description}</p>
-            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-            <a href={purpose.privacy_url} target="_blank" rel="noopener noreferrer">{label('privacy')}</a>
-          </div>
-        {/each}
-      </fieldset>
+{#snippet controls(details: boolean, closable: boolean)}
+  <h2>{label('title')}</h2>
+  <p>{label('intro')}</p>
+  {#if failure}<p class="feedback" role="alert">{label(failure)}</p>{/if}
+  {#if details && consent}
+    <fieldset disabled={busy}>
+      <legend>{label('customize')}</legend>
+      {#each consent.purposes as purpose (purpose.subject)}
+        <div class="purpose">
+          <label><input type="checkbox" bind:checked={draft[purpose.subject]} /> <strong>{purpose.name}</strong></label>
+          <p>{purpose.purpose} : {purpose.description}</p>
+          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+          <a href={purpose.privacy_url} target="_blank" rel="noopener noreferrer">{label('privacy')}</a>
+        </div>
+      {/each}
+    </fieldset>
+  {/if}
+  <div class="actions">
+    <button type="button" disabled={busy} onclick={() => void save('accept')}>{label('accept')}</button>
+    <button type="button" disabled={busy} onclick={() => void save('refuse')}>{label('refuse')}</button>
+    {#if details}
+      <button type="button" disabled={busy} onclick={() => void save('custom')}>{label('save')}</button>
+      {#if closable}<button type="button" disabled={busy} onclick={() => expanded = false}>{label('cancel')}</button>{/if}
+    {:else}
+      <button type="button" disabled={busy} onclick={customize}>{label('customize')}</button>
     {/if}
-    <div class="actions">
-      <button type="button" disabled={busy} onclick={() => void save('accept')}>{label('accept')}</button>
-      <button type="button" disabled={busy} onclick={() => void save('refuse')}>{label('refuse')}</button>
-      {#if expanded}
-        <button type="button" disabled={busy} onclick={() => void save('custom')}>{label('save')}</button>
-        {#if !required}<button type="button" disabled={busy} onclick={() => expanded = false}>{label('cancel')}</button>{/if}
+  </div>
+  {#if busy}<p role="status">{label('saving')}</p>{/if}
+{/snippet}
+
+{#snippet inlineContent()}
+  {#if inline}
+    <section class="consent-panel" aria-label={label('title')}>
+      {#if offered}
+        {@render controls(true, false)}
+        {#if consent?.complete && !blocked && !expired && consent.expires_at}
+          <p>{label('validUntil')} {new Date(consent.expires_at).toLocaleDateString(language)}</p>
+        {/if}
+      {:else if failure}
+        <p role="alert">{label(failure)}</p>
+        <button type="button" onclick={() => void refresh()}>{label('retry')}</button>
+      {:else if consent}
+        <p>{label('noPurposes')}</p>
       {:else}
-        <button type="button" disabled={busy} onclick={customize}>{label('customize')}</button>
+        <p role="status">{label('loading')}</p>
       {/if}
-    </div>
-    {#if busy}<p role="status">{label('saving')}</p>{/if}
-  </section>
-{:else if failure}
-  <section class="consent-panel" aria-label={label('title')}>
-    <p role="alert">{label(failure)}</p>
-    <button type="button" onclick={() => void refresh()}>{label('retry')}</button>
-  </section>
+      <p>{label('browserOnly')}</p>
+    </section>
+  {/if}
+{/snippet}
+
+{@render children?.()}
+
+{#if !inline}
+  {#if children && showFooter}
+    <footer class="privacy-footer">
+      <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+      <a href="/privacy">{label('policyLink')}</a>
+      {#if offered && !show}
+        <button type="button" class="footer-preferences" onclick={customize}>{label('preferences')}</button>
+      {/if}
+    </footer>
+  {:else if !children && offered && !show}
+    <button type="button" class="preferences" onclick={customize}>{label('preferences')}</button>
+  {/if}
+  {#if show && consent}
+    <section class="consent-panel" class:floating={required || !children} aria-label={label('title')}>
+      {@render controls(expanded, expanded && !required)}
+    </section>
+  {:else if failure}
+    <section class="consent-panel" class:floating={!children || !showFooter} aria-label={label('title')}>
+      <p role="alert">{label(failure)}</p>
+      <button type="button" onclick={() => void refresh()}>{label('retry')}</button>
+    </section>
+  {/if}
 {/if}
 
 <style>
-  .consent-panel { position: fixed; inset-inline: max(1rem, calc((100vw - 48rem) / 2)); bottom: 1rem; z-index: 1000; max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.25rem; border-radius: .75rem; border: 1px solid #6b7280; background: Canvas; color: CanvasText; box-shadow: 0 .25rem 1.5rem #0003; text-align: start; }
+  .consent-panel { max-width: 48rem; margin: 1rem auto; padding: 1.25rem; border-radius: .75rem; border: 1px solid #6b7280; background: Canvas; color: CanvasText; box-shadow: 0 .25rem 1.5rem #0003; text-align: start; }
+  .floating { position: fixed; inset-inline: max(1rem, calc((100vw - 48rem) / 2)); bottom: 1rem; z-index: 1000; max-height: calc(100dvh - 2rem); overflow: auto; margin: 0; }
+  .privacy-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem 1.25rem; padding: 1rem; font-size: .85rem; }
+  .privacy-footer a, .footer-preferences { color: LinkText; text-decoration: underline; }
+  .footer-preferences { background: transparent; border: 0; padding: 0; }
   h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
   p { margin: .5rem 0; line-height: 1.5; }
   .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }

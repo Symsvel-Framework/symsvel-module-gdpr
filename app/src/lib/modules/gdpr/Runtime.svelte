@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { apiBaseUrl } from '../../api/client';
@@ -10,7 +10,8 @@
   import type { Scope } from './consent-client';
   import { ConsentConsumerBridge, type ConsentConsumerFactory } from './consent-consumer';
 
-  let { scope, language = 'fr' }: { scope: Scope; language?: string } = $props();
+  let { scope, language = 'fr', children, showFooter = true }: { scope: Scope; language?: string; children?: Snippet; showFooter?: boolean } = $props();
+  const inline = $derived(!!children && (page.route.id === '/privacy' || (scope === 'app' && page.route.id === '/profile' && page.url.searchParams.get('tab') === 'consents')));
   const policyLabel = $derived(generatedTranslation(language, scope + '.gdpr.policyLink')
     ?? (language.toLowerCase().startsWith('en') ? en.policyLink : fr.policyLink));
   const bridge = new ConsentConsumerBridge();
@@ -44,9 +45,9 @@
   });
 </script>
 
-<ConsentPanel {scope} {language} {apiOrigin} onPermitChange={value => bridge.publish(value)} onSelectionCommitted={() => bridge.selectionCommitted()} />
+<ConsentPanel {scope} {language} {apiOrigin} {children} {inline} {showFooter} onPermitChange={value => bridge.publish(value)} onSelectionCommitted={() => bridge.selectionCommitted()} />
 
-{#if page.route.id !== '/privacy'}
+{#if !children && page.route.id !== '/privacy'}
   <!-- The optional module owns this exact route; the host may build without it. -->
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
   <a class="policy-link" href="/privacy">{policyLabel}</a>

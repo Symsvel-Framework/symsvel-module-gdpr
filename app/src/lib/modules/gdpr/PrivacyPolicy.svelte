@@ -3,6 +3,7 @@
   import fr from '../../translations/gdpr/fr';
   import en from '../../translations/gdpr/en';
   import type { Scope } from './consent-client';
+  import ConsentOutlet from './ConsentOutlet.svelte';
 
   let { scope, language = 'fr' }: { scope: Scope; language?: string } = $props();
   function label(key: keyof typeof fr): string {
@@ -25,6 +26,7 @@
   <section>
     <h2>{label('cookiesHeading')}</h2>
     <p>{label('cookiesText')}</p>
+    <ConsentOutlet />
   </section>
   <section>
     <h2>{label('rightsHeading')}</h2>
@@ -42,7 +44,7 @@
 </main>
 
 <style>
-  .policy { max-width: 52rem; margin: 0 auto; padding: 2rem 1.25rem 8rem; color: CanvasText; background: Canvas; }
+  .policy { max-width: 52rem; margin: 0 auto; padding: 2rem 1.25rem; color: CanvasText; background: Canvas; }
   section { margin-block: 2rem; }
   p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
   a { color: LinkText; }
