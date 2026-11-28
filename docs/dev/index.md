@@ -131,3 +131,5 @@ Le lien mailto validé est explicitement externe au routeur SvelteKit ; le lint 
 ## Correctif CT local : origine API native
 
 Runtime réutilise `apiBaseUrl()` de l'hôte App/Front pendant l'hydratation navigateur, et transmet la même origine à ConsentPanel et au consommateur Tracking. L'URL explicite `PUBLIC_API_URL` reste prioritaire ; le fallback natif est utilisé en local. Aucun accès à `window` au prérendu. Le client garde la validation stricte d'URL, le serveur garde la validation exacte des origines Setup et le refus par défaut. La QA Playwright exécute les scénarios de consentement sans `PUBLIC_API_URL`, puis le scénario consommateur avec une URL explicite. Front doit être mis à jour avec le helper commun avant le nouveau GDPR.
+
+La garde de prérendu utilise `typeof window === 'undefined'`, comme les helpers natifs, sans import `$app/environment` non résolu par le contrôle TypeScript des hôtes. La même QA de build statique et de consentement navigateur couvre ce raccordement.

@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
-  import { browser } from '$app/environment';
   import { apiBaseUrl } from '../../api/client';
   import ConsentPanel from './ConsentPanel.svelte';
   import { generatedTranslation } from '../../i18n/generated-translations';
@@ -16,7 +15,7 @@
     ?? (language.toLowerCase().startsWith('en') ? en.policyLink : fr.policyLink));
   const bridge = new ConsentConsumerBridge();
   // Share the host's API resolution; no browser location during static prerender.
-  const apiOrigin = browser ? apiBaseUrl() : '';
+  const apiOrigin = typeof window === 'undefined' ? '' : apiBaseUrl();
   // Tracking is optional. The exact entry is owned by Tracking and copied by Tooling.
   const factory = import.meta.glob<ConsentConsumerFactory>('../tracking/consent-consumer.ts', {
     eager: true, import: 'createConsentConsumer'
