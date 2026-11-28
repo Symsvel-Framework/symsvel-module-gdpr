@@ -127,3 +127,7 @@ La route publique exacte `/privacy` est fournie par GDPR dans App/Front, via le 
 Alias de branche dev 1.0.x-dev aligné sur la recette Flex 1.0 ; aucune release stable créée.
 
 Le lien mailto validé est explicitement externe au routeur SvelteKit ; le lint est neutralisé uniquement sur ce lien, sans modifier les règles de l'hôte.
+
+## Correctif CT local : origine API native
+
+Runtime réutilise `apiBaseUrl()` de l'hôte App/Front pendant l'hydratation navigateur, et transmet la même origine à ConsentPanel et au consommateur Tracking. L'URL explicite `PUBLIC_API_URL` reste prioritaire ; le fallback natif est utilisé en local. Aucun accès à `window` au prérendu. Le client garde la validation stricte d'URL, le serveur garde la validation exacte des origines Setup et le refus par défaut. La QA Playwright exécute les scénarios de consentement sans `PUBLIC_API_URL`, puis le scénario consommateur avec une URL explicite. Front doit être mis à jour avec le helper commun avant le nouveau GDPR.

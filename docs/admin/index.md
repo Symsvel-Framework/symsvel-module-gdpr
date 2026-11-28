@@ -21,3 +21,5 @@ La commande `php bin/console symsvel:gdpr:process --env=prod` est une simulation
 ## Informations légales et droits
 
 Avant publication, compléter les clés `app.gdpr.dataText`, `app.gdpr.cookiesText`, `app.gdpr.rightsText`, `app.gdpr.rightsEmail` et leurs équivalents Front pour chaque langue utilisée, dans Languages. Publier les traductions et reconstruire les Sveltes. La page `/privacy` reste accessible sans compte et sans traceur ; l'adresse doit être une boîte de contact réellement surveillée. Le lien de contact ouvre la messagerie du visiteur, sans confirmation de réception. Le responsable organise les demandes, la vérification de l'identité, les délais, les justificatifs de conservation et la réponse. Le module ne traite pas automatiquement une demande de droit.
+
+En local, le Runtime résout l'origine API via le helper de l'interface, comme le branding. Pour un domaine personnalisé, configurer `PUBLIC_API_URL` au build. Ne pas désactiver le contrôle des origines pour corriger une erreur de préférences. Sur une installation dev existante, actualiser Front avant GDPR, puis reconstruire via la mise à jour du module.

@@ -65,8 +65,9 @@ jobs:
           npx playwright install --with-deps chromium
           npm run test:unit -- --run --project client src/lib/modules/gdpr/ConsentPanel.svelte.spec.ts
       - working-directory: assembled
+        # Regression: real local install without PUBLIC_API_URL. The host's fallback must work.
         env:
-          PUBLIC_API_URL: http://localhost:4173
+          PUBLIC_API_URL: ''
         run: npx playwright test src/routes/privacy-runtime.e2e.ts
       - name: Assemble synthetic optional consumer
         run: |
