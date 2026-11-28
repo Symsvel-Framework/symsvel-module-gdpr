@@ -15,7 +15,10 @@
 
   // Register during component initialization, not in a consumer's onMount callback.
   beforeNavigate(navigation => {
-    if (navigation.willUnload || !navigation.to || !bridge.requiresDocumentNavigation()) return;
+    // Invalidate the previous route before an in-flight projection can start a SDK.
+    const fullDocument = bridge.requiresDocumentNavigation();
+    bridge.routeChanged(null, new URL(window.location.href));
+    if (navigation.willUnload || !navigation.to || !fullDocument) return;
     navigation.cancel();
     window.location.assign(navigation.to.url.href);
   });

@@ -47,6 +47,10 @@ describe('optional consent consumer', () => {
     expect(calls).toEqual(['route', 'permit']);
     expect(consumer.routeChanged).toHaveBeenCalledWith('/about', url);
     expect(bridge.requiresDocumentNavigation()).toBe(true);
+    bridge.routeChanged(null, url);
+    expect(consumer.routeChanged).toHaveBeenLastCalledWith(null, url);
+    // A consumer must retain document isolation even after its old route is invalidated.
+    expect(bridge.requiresDocumentNavigation()).toBe(true);
     bridge.selectionCommitted();
     expect(consumer.selectionCommitted).toHaveBeenCalledOnce();
   });
