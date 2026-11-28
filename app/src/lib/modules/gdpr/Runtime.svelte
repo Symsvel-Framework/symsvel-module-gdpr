@@ -23,8 +23,10 @@
     navigation.cancel();
     window.location.assign(navigation.to.url.href);
   });
-  afterNavigate(navigation => {
-    bridge.routeChanged(navigation.to?.route.id ?? null, navigation.to?.url ?? new URL(window.location.href));
+  afterNavigate(() => {
+    // After a completed navigation (including the initial enter), the current
+    // page state is authoritative. The navigation event may omit its destination.
+    bridge.routeChanged(page.route.id, new URL(window.location.href));
   });
 
   onMount(() => {

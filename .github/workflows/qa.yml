@@ -60,3 +60,16 @@ jobs:
         env:
           PUBLIC_API_URL: http://localhost:4173
         run: npx playwright test src/routes/privacy-runtime.e2e.ts
+      - name: Assemble synthetic optional consumer
+        run: |
+          mkdir -p assembled/src/lib/modules/tracking
+          cp tests/fixtures/consent-consumer.ts assembled/src/lib/modules/tracking/
+          cp "${{ matrix.scope }}/tests/privacy-consumer.e2e.ts" assembled/src/routes/
+      - working-directory: assembled
+        env:
+          PUBLIC_API_URL: http://localhost:4173
+        run: |
+          npm run format
+          npm run check
+          npm run lint
+          npx playwright test src/routes/privacy-consumer.e2e.ts
