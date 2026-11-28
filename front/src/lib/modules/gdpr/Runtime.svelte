@@ -11,7 +11,7 @@
   import { ConsentConsumerBridge, type ConsentConsumerFactory } from './consent-consumer';
 
   let { scope, language = 'fr', children, showFooter = true }: { scope: Scope; language?: string; children?: Snippet; showFooter?: boolean } = $props();
-  const inline = $derived(!!children && (page.route.id === '/privacy' || (scope === 'app' && page.route.id === '/profile' && page.url.searchParams.get('tab') === 'consents')));
+  const inline = $derived(!!children && (page.route.id === '/privacy' || (scope === 'app' && String(page.route.id) === '/profile' && page.url.searchParams.get('tab') === 'consents')));
   const policyLabel = $derived(generatedTranslation(language, scope + '.gdpr.policyLink')
     ?? (language.toLowerCase().startsWith('en') ? en.policyLink : fr.policyLink));
   const bridge = new ConsentConsumerBridge();
