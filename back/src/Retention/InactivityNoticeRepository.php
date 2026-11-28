@@ -86,6 +86,43 @@ final readonly class InactivityNoticeRepository
         return $this->db->delete('symsvel_gdpr_inactivity_notices', ['user_id' => $userId]);
     }
 
+    public function maximumUserId(): int
+    {
+        return (int) $this->db->fetchOne('SELECT COALESCE(MAX(user_id), 0) FROM symsvel_gdpr_inactivity_notices');
+    }
+
+    /** @return list<array{user_id:int,cycle_hash:string,attempt:string}> */
+    public function batchKeys(int $afterUser, string $afterCycle, int $maximumUser, int $limit): array
+    {
+        if ($afterUser < 0 || $maximumUser < 0 || $limit < 1 || $limit > 1000) {
+            throw new \InvalidArgumentException('Invalid notice scan bounds.');
+        }
+        $rows = $this->db->createQueryBuilder()
+            ->select('user_id', 'cycle_hash', 'attempt')
+            ->from('symsvel_gdpr_inactivity_notices')
+            ->where('(user_id > :after OR (user_id = :after AND cycle_hash > :cycle)) AND user_id <= :maximum')
+            ->setParameter('after', $afterUser, \Doctrine\DBAL\ParameterType::INTEGER)
+            ->setParameter('cycle', $afterCycle)
+            ->setParameter('maximum', $maximumUser, \Doctrine\DBAL\ParameterType::INTEGER)
+            ->orderBy('user_id', 'ASC')->addOrderBy('cycle_hash', 'ASC')
+            ->setMaxResults($limit)->executeQuery()->fetchAllAssociative();
+        return array_map(static fn (array $r): array => [
+            'user_id' => (int) $r['user_id'], 'cycle_hash' => $r['cycle_hash'], 'attempt' => $r['attempt'],
+        ], $rows);
+    }
+
+    /** Only an obsolete, locked snapshot may be removed. */
+    public function removeAttempt(int $userId, string $cycle, string $attempt): bool
+    {
+        $this->validate($userId, $cycle, $attempt);
+        if (!$this->db->isTransactionActive()) {
+            throw new \LogicException('Obsolete notice removal requires the owner transaction.');
+        }
+        return $this->db->delete('symsvel_gdpr_inactivity_notices', [
+            'user_id' => $userId, 'cycle_hash' => $cycle, 'attempt' => $attempt,
+        ]) === 1;
+    }
+
     private function validate(int $userId, string $cycle, ?string $attempt = null): void
     {
         if ($userId < 1 || !preg_match('/^[a-f0-9]{64}$/D', $cycle)

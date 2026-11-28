@@ -43,6 +43,8 @@ use SymSvel\Module\Gdpr\Retention\AccountErasureContributor;
 use SymSvel\Module\Gdpr\Retention\AccountErasureContributorRegistry;
 use SymSvel\Module\Gdpr\Retention\InactivityCandidate;
 use SymSvel\Module\Gdpr\Retention\InactivityProcessor;
+use SymSvel\Module\Gdpr\Retention\InactivityNoticeCleanup;
+use SymSvel\Module\Gdpr\Retention\AccountRetentionInspector;
 use Doctrine\DBAL\Connection;
 
 final class InactivityProcessorTest extends TestCase
@@ -101,7 +103,7 @@ final class InactivityProcessorTest extends TestCase
                 $db->insert('fixture_users', ['id' => $id, 'treated' => 0]);
                 $db->insert('fixture_business', ['user_id' => $id]);
             }
-            $owner = new class($db, $activity) implements AccountRetentionOwner {
+            $owner = new class($db, $activity) implements AccountRetentionOwner, AccountRetentionInspector {
                 public bool $changePolicy = false;
                 public function __construct(private Connection $db, private \DateTimeImmutable $activity) {}
                 public function maximumId(): int { return 2; }
@@ -109,6 +111,15 @@ final class InactivityProcessorTest extends TestCase
                 {
                     $ids = $this->db->fetchFirstColumn('SELECT id FROM fixture_users WHERE treated = 0 AND id > ? AND id <= ? ORDER BY id', [$afterId, $maximumId]);
                     return array_map(fn ($id) => new InactivityCandidate((int) $id, $id == 1 ? 'person@example.test' : 'other@example.test', 'en', $this->activity), array_slice($ids, 0, $limit));
+                }
+                public function inspect(int $userId, bool $lock, callable $inspect): void
+                {
+                    $read = function () use ($userId, $inspect): void {
+                        $exists = $this->db->fetchOne('SELECT id FROM fixture_users WHERE id = ? AND treated = 0', [$userId]);
+                        $inspect($exists === false ? null : new InactivityCandidate($userId,
+                            $userId === 1 ? 'person@example.test' : 'other@example.test', 'en', $this->activity));
+                    };
+                    if ($lock) $this->db->transactional($read); else $read();
                 }
                 public function treat(InactivityCandidate $candidate, string $mode, \DateTimeImmutable $now, callable $authorize): bool
                 {
@@ -170,6 +181,27 @@ final class InactivityProcessorTest extends TestCase
             self::assertSame(0, $tester->execute([]));
             self::assertStringContainsString('Dry run', $tester->getDisplay());
             self::assertSame(2, $tester->execute(['--execute' => true, '--dry-run' => true]));
+            // Old notices for erased accounts and changed cycles can be removed;
+            // the current ambiguous attempt can never be cleared by a sweep.
+            $old = str_repeat('b', 64);
+            $recent = str_repeat('c', 64);
+            $notices->claim(1, $old, $now);
+            $notices->claim(2, $old, $now);
+            $notices->claim(2, $recent, $later);
+            $cleanup = new InactivityNoticeCleanup(new AccountRetentionOwnerRegistry([$owner]), $configuration, $cycles, $notices);
+            $dry = $cleanup->run($later, false, 1);
+            self::assertSame(2, $dry['counts']['obsolete']);
+            self::assertSame(1, $dry['counts']['ambiguous']);
+            self::assertSame(1, $dry['counts']['recent_pending']);
+            self::assertSame(4, (int) $db->fetchOne('SELECT COUNT(*) FROM symsvel_gdpr_inactivity_notices'));
+            $clean = $cleanup->run($later, true, 1);
+            self::assertSame(2, $clean['counts']['removed']);
+            self::assertSame(0, $clean['counts']['errors']);
+            self::assertSame(2, (int) $db->fetchOne('SELECT COUNT(*) FROM symsvel_gdpr_inactivity_notices'));
+            self::assertNotNull($notices->find(2, $cycles->fingerprint(2, 'other@example.test', $activity, 12, 7, 'anonymize')));
+            $maintenance = new \Symfony\Component\Console\Tester\CommandTester(new \SymSvel\Module\Gdpr\Command\ProcessInactivityCommand($processor, sys_get_temp_dir(), $cleanup));
+            self::assertSame(0, $maintenance->execute(['--cleanup-notices' => true]));
+            self::assertStringContainsString('ambiguous: 1', $maintenance->getDisplay());
             $settings->set('gdpr.enabled', false);
             $settings->flush();
             self::assertSame('disabled', $processor->run($later, true)['status']);

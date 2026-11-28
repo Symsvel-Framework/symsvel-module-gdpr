@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use SymSvel\Module\Gdpr\Retention\InactivityProcessor;
+use SymSvel\Module\Gdpr\Retention\InactivityNoticeCleanup;
 
 #[AsCommand(name: 'symsvel:gdpr:process', description: 'Inspect or explicitly process inactive App accounts.')]
 final class ProcessInactivityCommand extends Command
@@ -18,6 +19,7 @@ final class ProcessInactivityCommand extends Command
     public function __construct(
         private readonly InactivityProcessor $processor,
         #[Autowire('%kernel.project_dir%')] private readonly string $projectDir,
+        private readonly ?InactivityNoticeCleanup $cleanup = null,
     ) {
         parent::__construct();
     }
@@ -25,6 +27,7 @@ final class ProcessInactivityCommand extends Command
     protected function configure(): void
     {
         $this->addOption('execute', null, InputOption::VALUE_NONE, 'Send notices and treat eligible accounts.')
+            ->addOption('cleanup-notices', null, InputOption::VALUE_NONE, 'Inspect or remove obsolete notice attempts only; never process accounts.')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Inspect only (default).')
             ->addOption('batch-size', null, InputOption::VALUE_REQUIRED, 'Number of accounts per batch, 1 to 1000.', '100');
     }
@@ -51,13 +54,15 @@ final class ProcessInactivityCommand extends Command
                 }
             }
             $output->writeln($execute ? 'Execution mode.' : 'Dry run (no messages or account changes).');
-            $report = $this->processor->run(new \DateTimeImmutable('now', new \DateTimeZone('UTC')), $execute, (int) $size,
+            $service = $input->getOption('cleanup-notices') ? $this->cleanup : $this->processor;
+            if ($service === null) throw new \LogicException('Notice cleanup service unavailable.');
+            $report = $service->run(new \DateTimeImmutable('now', new \DateTimeZone('UTC')), $execute, (int) $size,
                 static function (int $id, string $type) use ($output): void {
                     $output->writeln(sprintf('<error>Account #%d: %s</error>', $id, $type));
                 });
             $output->writeln('Status: '.$report['status']);
             foreach ($report['counts'] as $name => $count) $output->writeln($name.': '.$count);
-            return $report['counts']['errors'] > 0 || ($execute && $report['counts']['unconfigured'] > 0)
+            return $report['counts']['errors'] > 0 || ($execute && ($report['counts']['unconfigured'] ?? 0) > 0)
                 ? Command::FAILURE : Command::SUCCESS;
         } catch (\Throwable $failure) {
             $output->writeln('<error>Retention pass failed: '.$failure::class.'</error>');

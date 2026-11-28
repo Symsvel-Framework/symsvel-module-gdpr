@@ -13,3 +13,7 @@ La commande serveur `php bin/console symsvel:gdpr:cleanup-consents --env=prod` r
 ## Comptes inactifs
 
 La commande `php bin/console symsvel:gdpr:process --env=prod` est une simulation par défaut. Elle affiche les candidats au préavis ou au traitement, les tentatives ambiguës et les erreurs sans afficher les adresses. Pour autoriser une exécution manuelle, ajouter `--execute` ; `--batch-size=100` borne les lots. Ne planifier aucune exécution automatique avant validation du projet, du transport mail synchrone, des obligations de conservation et des CT. Une tentative de préavis ambiguë bloque le traitement ; ne jamais l'assimiler à une livraison confirmée. BO seul sans propriétaire Users : aucune action. Le verrou de commande est local à l'hôte ; les contrôles de cycle et de transaction restent obligatoires. Le raccordement du propriétaire natif est encore en chantier.
+
+### Maintenance des préavis
+
+`php bin/console symsvel:gdpr:process --cleanup-notices --env=prod` est une simulation ; ajouter `--execute` pour supprimer seulement les tentatives devenues obsolètes. Les préavis courants ambigus restent bloquants, même anciens : examiner les journaux du transport avant toute réconciliation. Une réservation obsolète récente est protégée pendant 24 h. Cette opération ne traite aucun compte et n'envoie aucun mail.
