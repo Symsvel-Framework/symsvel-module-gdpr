@@ -32,9 +32,12 @@ jobs:
       - name: Assemble module client
         run: |
           cmp app/src/lib/modules/gdpr/consent-client.ts front/src/lib/modules/gdpr/consent-client.ts
-          mkdir -p assembled/src/lib/modules/gdpr
+          cmp app/src/lib/modules/gdpr/ConsentPanel.svelte front/src/lib/modules/gdpr/ConsentPanel.svelte
+          mkdir -p assembled/src/lib/modules/gdpr assembled/src/lib/translations/gdpr
           cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.ts assembled/src/lib/modules/gdpr/
-          cp "${{ matrix.scope }}/tests/consent-client.test.ts" assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.svelte assembled/src/lib/modules/gdpr/
+          cp "${{ matrix.scope }}/src/lib/translations/"*.ts assembled/src/lib/translations/gdpr/
+          cp "${{ matrix.scope }}/tests/"*.ts assembled/src/lib/modules/gdpr/
       - working-directory: assembled
         run: npm ci --no-audit --no-fund
       - working-directory: assembled
@@ -44,3 +47,5 @@ jobs:
           npm run lint
           npm run build
           npm run test:unit -- --run --project server src/lib/modules/gdpr/consent-client.test.ts
+          npx playwright install --with-deps chromium
+          npm run test:unit -- --run --project client src/lib/modules/gdpr/ConsentPanel.svelte.spec.ts

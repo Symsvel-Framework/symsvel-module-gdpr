@@ -58,3 +58,7 @@ Le module expose POST state et PUT consent sous /apiopen/gdpr/{app|front}, contr
 ## Client statique
 
 Le client de consentement est identique dans les deux scopes ; aucune dépendance npm ou framework externe supplémentaire. Il exige PUBLIC_API_URL, utilise le transport dédié sans cookie ni redirection et vérifie la réponse avant toute utilisation. Le marqueur local de blocage doit être écrit avant le retrait et ne sera levé qu'après confirmation et réconciliation serveur. Le futur composant doit traiter les événements de stockage, les erreurs et la revalidation avant activation du moindre SDK. Aucun montage automatique pour le moment.
+
+## Premier écran de consentement
+
+Le composant Svelte identique App/Front affiche les choix et les préférences sans dépendance npm supplémentaire. Refus et acceptation ont une visibilité équivalente. Un échec de changement conserve un blocage local, les autres onglets et la reprise de visibilité déclenchent une relecture. Aucune publication de grant vers un loader à cette étape ; le contrat de montage hôte, l'arbitrage multi-onglets et le cycle d'arrêt des SDK seront traités avant activation réseau.
