@@ -30,6 +30,8 @@ test('installed GDPR mounts exactly once and does not create identity before a c
   expect(await page.evaluate(() => localStorage.getItem('symsvel.gdpr.app'))).toBeNull();
   await refuse.click();
   await expect(page.getByRole('button', { name: /Préférences cookies|Cookie preferences/ })).toBeVisible();
+  await expect(page.locator('.privacy-footer')).toBeVisible();
+  await expect(page.locator('.consent-panel.floating')).toHaveCount(0);
   expect(writes).toBe(1);
   await page.locator('a[href$="/forgot-password"]').click();
   await expect(page.getByRole('button', { name: /Préférences cookies|Cookie preferences/ })).toHaveCount(1);
@@ -110,6 +112,32 @@ test('public privacy page remains available without tracking or account identity
   await expect(page.getByRole('heading', { name: /Données personnelles et cookies|Personal data and cookies/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: /Exercer vos droits|Exercise your rights/ })).toBeVisible();
   await expect(page.getByText(/n.a pas encore été configuré|has not been configured/)).toBeVisible();
+  await expect(page.getByText(/Aucun traceur facultatif|No optional trackers/)).toBeVisible();
   expect(writes).toBe(0);
   expect(await page.evaluate(() => localStorage.getItem('symsvel.gdpr.app'))).toBeNull();
+});
+
+
+test('privacy page renders the same manager inline and permits withdrawal', async ({ page }) => {
+  const scope = 'app';
+  const credential = 'a'.repeat(64) + '.' + 'b'.repeat(64);
+  let granted = true;
+  let reads = 0;
+  let writes = 0;
+  const state = () => ({ enabled: true, complete: true, version: (writes + 1).toString(16).padStart(32, '0'), expires_at: '2099-01-01T00:00:00Z', purposes: [{ subject: 'tracker-example', revision: 1, name: 'Example', purpose: 'Audience', description: 'Description', privacy_url: 'https://example.invalid/privacy', decided: true, granted }] });
+  await page.addInitScript(({ scope, credential }) => localStorage.setItem('symsvel.gdpr.' + scope, credential), { scope, credential });
+  await page.route('**/apiopen/project', route => route.fulfill({ json: { data: { name: 'GDPR CT' } } }));
+  await page.route('**/apiopen/gdpr/' + scope + '/consent/state', route => { reads++; return route.fulfill({ json: { data: state() } }); });
+  await page.route('**/apiopen/gdpr/' + scope + '/consent', route => { writes++; granted = route.request().postDataJSON().choices['tracker-example'].granted; return route.fulfill({ json: { data: state() } }); });
+  await page.goto('http://localhost:4173/login');
+  await expect(page.getByRole('button', { name: /Préférences cookies|Cookie preferences/ })).toBeVisible();
+  await page.getByRole('link', { name: /Données personnelles et cookies|Personal data and cookies/ }).click();
+  await expect(page.getByRole('checkbox')).toBeChecked();
+  await expect(page.locator('.consent-panel.floating')).toHaveCount(0);
+  await page.getByRole('button', { name: /Tout refuser|Refuse all/ }).click();
+  await expect(page.getByRole('checkbox')).not.toBeChecked();
+  await expect(page.getByRole('button', { name: /Tout refuser|Refuse all/ })).toBeEnabled();
+  expect(reads).toBe(1);
+  expect(writes).toBe(1);
+  expect(granted).toBe(false);
 });

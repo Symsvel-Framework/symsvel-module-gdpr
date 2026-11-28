@@ -34,6 +34,8 @@ jobs:
           cmp app/src/lib/modules/gdpr/consent-client.ts front/src/lib/modules/gdpr/consent-client.ts
           cmp app/src/lib/modules/gdpr/ConsentPanel.svelte front/src/lib/modules/gdpr/ConsentPanel.svelte
           cmp app/src/lib/modules/gdpr/Runtime.svelte front/src/lib/modules/gdpr/Runtime.svelte
+          cmp app/src/lib/modules/gdpr/LayoutRuntime.svelte front/src/lib/modules/gdpr/LayoutRuntime.svelte
+          cmp app/src/lib/modules/gdpr/ConsentOutlet.svelte front/src/lib/modules/gdpr/ConsentOutlet.svelte
           cmp app/src/lib/modules/gdpr/consent-consumer.ts front/src/lib/modules/gdpr/consent-consumer.ts
           mkdir -p assembled/src/lib/modules/gdpr assembled/src/lib/translations/gdpr
           cp "${{ matrix.scope }}/src/lib/modules/gdpr/"*.ts assembled/src/lib/modules/gdpr/
