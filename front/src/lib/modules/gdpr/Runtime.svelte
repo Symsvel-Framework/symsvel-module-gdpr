@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { page } from '$app/state';
   import ConsentPanel from './ConsentPanel.svelte';
   import type { Scope } from './consent-client';
   import { ConsentConsumerBridge, type ConsentConsumerFactory } from './consent-consumer';
@@ -27,6 +28,8 @@
   });
 
   onMount(() => {
+    // Seed the actual initial route even if the host's first afterNavigate already ran.
+    bridge.routeChanged(page.route.id, new URL(window.location.href));
     bridge.attach(factory, scope, apiOrigin);
     return () => bridge.dispose();
   });
