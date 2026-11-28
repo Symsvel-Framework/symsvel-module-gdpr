@@ -11,6 +11,8 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use SymSvel\Module\Gdpr\Retention\AnonymizationRequirementRegistry;
 use SymSvel\Module\Gdpr\Retention\InactivityPolicy;
 use SymSvel\Module\Gdpr\Retention\InactivityCycle;
+use SymSvel\Module\Gdpr\Mail\GdprMailTemplateProvider;
+use SymSvel\Module\Gdpr\Mail\InactivityNoticeRenderer;
 use SymSvel\Module\Gdpr\Retention\InactivityNoticeRepository;
 use SymSvel\Module\Gdpr\Consent\ConsentPolicy;
 use SymSvel\Module\Gdpr\Consent\ConsentRepository;
@@ -27,10 +29,17 @@ use SymSvel\Module\Gdpr\Settings\GdprConfiguration;
 
 final class GdprBundle extends AbstractBundle
 {
+    public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
+    {
+        $container->extension('twig', ['paths' => [dirname(__DIR__).'/templates' => 'Gdpr']]);
+    }
+
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $builder->register(InactivityPolicy::class);
         $builder->register(InactivityCycle::class)->setAutowired(true);
+        $builder->register(GdprMailTemplateProvider::class)->addTag('symsvel.mails.template_provider');
+        $builder->register(InactivityNoticeRenderer::class)->setAutowired(true);
         $builder->register(InactivityNoticeRepository::class)->setAutowired(true);
         $builder->register(ConsentPolicy::class);
         $builder->register(ConsentRepository::class)->setAutowired(true);

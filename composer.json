@@ -7,7 +7,8 @@
         "php": ">=8.4",
         "symfony/framework-bundle": "^8.1",
         "symsvel-framework/module-settings": "dev-dev",
-        "doctrine/dbal": "^4.0"
+        "doctrine/dbal": "^4.0",
+        "symsvel-framework/module-mails": "^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -46,6 +47,10 @@
         {
             "type": "vcs",
             "url": "https://github.com/Symsvel-Framework/symsvel-module-acls.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/Symsvel-Framework/symsvel-module-mails.git"
         }
     ]
 }
