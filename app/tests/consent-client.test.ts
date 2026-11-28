@@ -8,7 +8,7 @@ const current: ConsentState = {
 };
 describe('consent client', () => {
   it('keeps the initial read anonymous and never sends cookies', async () => {
-    const fetcher = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ data: current })));
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: current })));
     const api = new ConsentApi('front', 'https://api.example.test', fetcher);
     await api.state(null);
     expect(fetcher.mock.calls[0][0]).toBe('https://api.example.test/apiopen/gdpr/front/consent/state');
@@ -20,7 +20,7 @@ describe('consent client', () => {
     expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer ' + credential);
   });
   it('sends explicit complete revisioned choices, including refusal', async () => {
-    const fetcher = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ data: { ...current, credential } })));
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: { ...current, credential } })));
     const api = new ConsentApi('app', 'https://api.example.test', fetcher);
     await api.save(null, null, selection(current, () => false));
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ version: null, choices: { 'tracker-example': { revision: 2, granted: false } } });
